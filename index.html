@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -98,6 +99,21 @@ tr:hover td{background:rgba(0,113,227,.03)}
 .search-box input{padding-left:36px}
 .search-box::before{content:'⌕';position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px}
 @media(max-width:600px){.dash-grid{grid-template-columns:1fr}.schedule-grid{font-size:10px;grid-template-columns:50px repeat(5,1fr)}.login-card{padding:32px 24px}.container{padding:0 16px}}
+
+.opinion-card{background:var(--card);border-radius:var(--radius);padding:20px;margin-bottom:12px;border:1px solid var(--border2)}
+.opinion-card .student-name{font-size:16px;font-weight:600;margin-bottom:8px}
+.opinion-card .opinion-meta{font-size:12px;color:var(--text3);margin-bottom:8px}
+.opinion-text{background:var(--bg);border-radius:8px;padding:12px;margin-top:8px;font-size:14px;line-height:1.6}
+.opinion-text.fr{border-left:3px solid var(--accent);background:rgba(0,113,227,.04)}
+.opinion-text.tr{border-left:3px solid var(--green);background:rgba(52,199,89,.04)}
+.opinion-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.opinion-badge.new{background:rgba(0,113,227,.1);color:var(--accent)}
+.opinion-badge.archived{background:rgba(134,134,139,.1);color:var(--text3)}
+.opinion-tabs{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:16px}
+.opinion-tab{flex:1;padding:8px 16px;border-radius:8px;border:none;background:transparent;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:.2s;text-align:center}
+.opinion-tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.gemini-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--accent);font-weight:500;padding:2px 6px;background:rgba(0,113,227,.06);border-radius:4px}
+.translation-loading{display:inline-flex;align-items:center;gap:6px;color:var(--text3);font-size:13px;padding:8px 0}
 </style>
 </head>
 <body>
@@ -131,6 +147,7 @@ tr:hover td{background:rgba(0,113,227,.03)}
         <div class="dash-card" onclick="navigate('students')"><div class="icon">📚</div><h3>Öğrenci Takip</h3><p>Öğrenci ekleme, veri girişi ve raporlama</p></div>
         <div class="dash-card" onclick="navigate('attendance')"><div class="icon">✅</div><h3>Yoklama Sistemi</h3><p>Günlük yoklama, geç gelen ve raporlar</p></div>
         <div class="dash-card" onclick="navigate('teachers')"><div class="icon">👨‍🏫</div><h3>Öğretmen Yönetimi</h3><p>Program, vekil atama ve raporlama</p></div>
+        <div class="dash-card" id="opinionsCard" onclick="navigate('opinions')" style="display:none"><div class="icon">💬</div><h3>Öğretmen Görüşleri</h3><p>Öğrenci değerlendirme ve görüş yazma</p></div>
       </div>
       <div id="adminPanel" style="display:none;margin-top:24px"><div class="card"><div class="card-header"><span class="card-title">👑 Yönetici Paneli</span></div>
         <button class="btn btn-secondary btn-sm" onclick="navigate('admin-users')" style="margin-right:8px">Kullanıcı Yönetimi</button>
@@ -149,6 +166,7 @@ tr:hover td{background:rgba(0,113,227,.03)}
     <div id="pg-teachers" class="page"><div class="page-header"><h2>👨‍🏫 Öğretmen Yönetimi</h2><div class="sub-nav" id="teacherNav"></div></div><div id="teacher-content"></div></div>
     <div id="pg-admin-users" class="page"><div class="page-header"><h2>👑 Kullanıcı Yönetimi</h2></div><div id="admin-users-content"></div></div>
     <div id="pg-schedule-config" class="page"><div class="page-header"><h2>⏰ Ders Saati Ayarları</h2></div><div id="schedule-config-content"></div></div>
+    <div id="pg-opinions" class="page"><div class="page-header"><h2>💬 Öğretmen Görüşleri</h2><div class="sub-nav" id="opinionsNav"></div></div><div id="opinions-content"></div></div>
   </main>
   <footer class="app-footer"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABRAfQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7LooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiioXu7VGKPcQqw4ILgEUATUVB9ttP+fqD/v4P8aPttp/z9Qf9/B/jRYCeioo7iCQ4jmjc+iuDUtABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUHpQAh6Yrw/4k/s3eFvFutalr0Gsarp2qX8zTyNlJYd5H9wgEDjs1eUfHr4r39l+0PaXml3k/wBg8LzRwPDHIwSdgc3AIBweCU5/u19gafd29/YW99aSCW3uI1licdGRgCp/Iiutwq4ZRmna5neM7o/MrX9Ln0XXtQ0a72m4sbqS2lK9CyMVJHscZr6X+GH7OHgzxT8PdD8RX2ra9DdahZJPKkMkQRWYdADGTj6mvB/jJ/yV3xd/2Grr/wBGGvrzwH4Tl8X/ALPXgzT4fEetaBJFYwyrc6XP5cjHaw2t6rznHqBXp4yrKNODTtf/ACMacU21Y8v+IH7L2o6Rpk2p+Bdfu76eBS/2G4URyyAf885EwC3oCBn1rz34bfGT4k+Cb+OOWbUtY01G2y2GoLI+BnkI5BZGHPcj1FQ/FzUfiD4B8e6l4Xf4heIb0WgR45/t8qF0dAy5G44POD9K6L4ia1F4M8UyeHb3xr8ULiaO3gma5h1aLYfNjV+EYA8Zx17U4qTio1LSvqgbV9ND678B+KdK8ZeFrLxDpDuba6UnZINskTg4ZHHZgeD/AIVu18Kt8SfiN4OFhr2g+PL3X9CvXdIm1CLfiRMF4Jo2JKSAFTlWwykFT6fVnwN+JFn8S/B41aO3Fnf20nkX1qG3COTGQVPUowORn3HavLxGElSXOtjaE1LQ76iiiuQ0CiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKzPFV/f6X4dvtQ0vSZdXvbeFnhso5AjTsOiBjwCa8v8A+Fo/E3/ohWt/+DOL/wCJrSFKU9V+aE5JHsdFeOf8LS+Jv/RCtb/8GcX/AMTR/wALR+Jv/RCtb/8ABpF/hV/V5+X3r/MXMj2OivHP+Fo/E3/ohWt/+DSL/Cj/AIWl8Tf+iFa3/wCDOL/4mj6vPy+9f5hzI9jorxz/AIWj8Tf+iFa3/wCDSL/Cj/haPxN/6IVrf/g0i/wo+rz8vvX+YcyPY6K8c/4Wl8Tf+iFa3/4M4v8A4mj/AIWj8Tf+iFa3/wCDSL/Cj6vPy+9f5hzo9jorxz/haPxN/wCiFa3/AODSL/Cj/haXxN/6IVrf/gzi/wDiaPq8/L71/mHOj2OivHP+Fo/E3/ohWt/+DSL/AAo/4Wl8Tf8AohWt/wDg0i/+Jo+rz8vvX+YcyPY6K8c/4Wl8Tf8AohWt/wDg0i/+Jo/4Wj8Tf+iFa3/4NIv8KPq8/L71/mHMj2OivHP+FpfE3/ohWt/+DOL/AOJo/wCFo/E3/ohWt/8Ag0i/wo+rz8vvX+YcyPY6K8c/4Wj8Tf8AohWt/wDg0i/wo/4Wl8Tf+iFa3/4M4v8A4mj6vPy+9f5hzI9jorxz/haPxN/6IVrf/g0i/wAKP+Fo/E3/AKIVrf8A4NIv8KPq8/L71/mHMj2OivHP+Fo/E3/ohWt/+DSL/wCJru/hx4h1/wAR6VcXXiHwhd+F7iKfy47e4uFlaRNoO8FQMDJIx7VE6UoK7t96BSTOornfiT4mt/B/gTWPEtwV22Fq0iKf45OiL+LFRVvxnq8+g+FtR1a00y61S5toGeGztoy8k8nRUAUE8kjJ7DJr5I+LfxL+IHj5dP8ABOpfDq9sJvtEd/Np8azNPdxR5+XaUBCZzlgD09q1w1B1ZX6dRTlyowviZ8MrzR/gx4X8e3SyPqmpTyTawzHJ/wBIPmQk+mMYPu9fQH7Hfi3/AISD4VR6RcS77zQpfsjAnkwn5oj+WV/4BXn3jn4ifEzxb4L1HwrffBHU4rS9t/JDJDcZiIwUZR5fVSAR9K8k+Cfj3xF8NvGN0NM0VtSur5fsMumyb0dpQ/ygAAneG3DGP4iK9KVOdeg4ytdO61MU1GV0ZHxk/wCSueLv+w1df+jDX3F+z5/yRTwj/wBguL+VfBXjq/vdU8a63qeo2Dafe3V/NNPaMDmB2YlkOcHg8c81798OPi58TtF8A6LpOjfCe+1OytbNIre9WK4ZZ0A4cbUI59jVY2jKdGEV08/IVOSUmcZ+1Rp17q/7RWoaXp0DT3d1DaRQxr/ETCPyA6k9AASeBXFfGjxBbeJviVq+rWbq9pujt4JAeHSGNYww9jsJHsRXa/ES/wDid4q1TUNU1LwvYeEmv4khvp5WSyeaJVwEeSdw+zHVVADdwazbDQNF+G15a614z8O6t4jkDA20C2slrppkxlQ00qAzeu1V28dWFa0pKEY31aVrIUldss+KPDB8Lfs1aNLqsZh1TxBrw1CCJ+GW3S3ZFJHbIYN/wNa9T/YMsbpNJ8Vak6strNcW8EZI4Z0Vi2PoHX8653wn4W1v9pDWpfFPiPxPY6dp2nyfZl0uxQtNbJ94BQ3C7v753Zx0GMD6n8HeG9H8J+HrXQdCtFtbG1XCIDkknksxPLMTySetcWKxFqbpv4m9fI0hG75uhr0UV5LqvxK+I1pqt3a2vwV1m9t4Z3jiuE1KJVmRWIDgEcAgA49682FNz2Nm7HrVFeOf8LS+Jv8A0QrW/wDwZxf/ABNH/C0fib/0QrW//BpF/hWn1efl96/zFzo9jorxz/haXxN/6IVrf/g0i/8AiaP+FpfE3/ohWt/+DSL/AOJo+rz8vvX+Yc6PY6K8c/4Wj8Tf+iFa3/4NIv8ACj/haXxN/wCiFa3/AODOL/4mj6vPy+9f5hzI9jorxz/haPxN/wCiFa3/AODSL/Cj/haPxN/6IVrf/g0i/wAKPq8/L71/mHMj2OivHP8AhaXxN/6IVrf/AIM4v/iaP+Fo/E3/AKIVrf8A4NIv8KPq8/L71/mHOj2OivHP+Fo/E3/ohWt/+DSL/Cj/AIWl8Tf+iFa3/wCDOL/4mj6vPy+9f5hzo9jorxz/AIWj8Tf+iFa3/wCDSL/Cj/haPxN/6IVrf/g0i/8AiaPq8/L71/mHMj2OivHP+FpfE3/ohWt/+DSL/wCJo/4Wj8Tf+iFa3/4NIv8ACj6vPy+9f5hzo9jorxz/AIWl8Tf+iFa3/wCDOL/4mj/haPxN/wCiFa3/AODSL/Cj6vPy+9f5hzI9jorxz/haPxN/6IVrf/g0i/wo/wCFpfE3/ohWt/8Agzi/+Jo+rz8vvX+YcyPY6K8c/wCFo/E3/ohWt/8Ag0i/wre8BeOPG2v+Il0/XfhfqXhyyMLub2e9SVQwxhMKO+T+VTKhOKu7feg5kei0UUVkUFFFFABRRRQAUmB6ClooATA9B+VGB6D8qWigBMD0H5UYHoPypaKAEwPQflRgeg/KlooATA9B+VGB6D8qWigBMD0H5UYHoPypaKAEwPQflRgeg/KlooATA9B+VGB6D8qWigBMD0H5UYHoPypaKAEwPQflRgeg/KlooATA9B+VGB6D8qWigBMD0H5UuMdKKCcDJoAbK6xxs7sFVRksTgAeteGfs9bvGvxH8a/FWcFree4/srSC38NvHgkj0zhPxLVX/aS+NHh3TfBmoeHPDOsW2o61qEbWzNZyCRLWNuHZnHG7bkAA5yc9q0P2XPGHgWD4WaB4ctdf06DVYkK3FnNKIpjO7kkBWxuySMEZzxXZGlOFBztvp8jNyTlY9tI4r4c/ay8OTeEvjM2uWG6CLVgmpQSJxsnVgJMe+4K3/Aq+4+1fNP7Z+reCta8GWsFv4h0y41/Tb8GK2gnWSTa3yyqQuduMA845XFGAm41tNnoFVXifOXxYkaX4o+J5XOXk1Wd2PqS2TX3P+z5/yRTwjz/zC4v5V8K/FL/kpfiP/sJTf+hV9pfBTxV4Y0b4N+FLfVvEWkWEyaTCzR3N7HG4BGQdpOa7swTdGFv60MqXxM+Yf2wFU/HfWWKqT9kteSOf9SK+x/EnhTSvG3w6/wCEd1mIvbXVpGA4+/E4UFZFPZlPP6dDXxJ+0r4g0vxR8YNa1XQ7pLyxaOGGKdD8khSIKSp7jORn2r7V+HPjrwl4m0XTY9G8Qadc3T2yZtVuF89SEG4GMncCMHPHascWpxpUmui/yKp2cpHxr4f1LxP8BPjBLDeRtJ9nYRXkKHEd9asch1/D5lPZgQe9fdXhvWdO8Q6FZ61pNylzY3kQlhlX+JT/ACI6EdiCK8o/aw+HVt4v8Dya7a+TDrOiRtLFI7BBND1eIsePdc/xDH8Rrwj9mb4yjwBePoPiBpZPDd2/mB1Us1lKerhepRv4gOQeR3BdSH1yl7SK95bhF+zlZ7H2/RgegrJ8M+JvD/ia1N14f1qw1OJQCzWs6ybM9NwHK9D1x0rWrymmtGbiYHoPyowPQflS0UAJgeg/KjA9B+VLRQAmB6D8qMD0H5UtFACYHoPyowPQflS0UAJgeg/KjA9B+VLRQAmB6D8qMD0H5UtFACYHoPyowPQflS0UAJgeg/KjA9B+VLRQAmB6D8qMD0H5UtFACYHoPyowPQflS0UAJgeg/KjA9BS0UAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUEAggjINFFAHDn4Q/DEkk+BdB5Of+PNalsvhV8OLK9gvbTwVocNxbyrLDIlooaN1OVYHsQQDXZ0Vp7Wf8zFyoTGBXy98Vtb8H6D4r1fStO+AK6xfQzkm/eyPkTSMA5f5UJblueRk5r6iox9fzp0avs3dq/zsKUbn5q6vo3jDVdWu9UvPDustc3c7zyldNlALMxJwNvA56V6b4C8SWun6Naab40+BkniSaziFvDqH9nus5iUnYj7oyG2g4ByOMV9u4+v50Y+v512zzDnVnH8TNUrdTzDwd8O/hj4j8L6drh+Gulaeb23Wb7Lc2SiWLP8LD1FdLoHw58C6Bq0WraL4U0iwv4QwjuILZVdAwIOD7gkV1VFcMqs3fV29TVRRT1rS9O1rS7jS9Vs4L2xuU2TQTIGSRfQg9RXJf8ACofhj/0Iug/+Ai13NFTGco7OwNJmF4V8H+F/Cv2n/hHNB0/SvtW3z/ssITzNuducdcZP51u0UUm23djCiiikAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFAH/9k=" alt="APR" style="width:220px;height:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto"><div>Özel Arkas Piri Reis Anadolu Lisesi<br>Atıl Çelik — Coordinateur des Technologies éducatives · EdTech Coordinator<br><a href="mailto:atil.celik@pirireis.k12.tr">atil.celik@pirireis.k12.tr</a></div></footer>
 </div>
@@ -163,25 +181,25 @@ function getSession(){const r=sessionStorage.getItem('session')||localStorage.ge
 function setSession(u){const d=JSON.stringify(u);if(u.is_test_user)sessionStorage.setItem('session',d);else localStorage.setItem('session',d)}
 function clearSession(){sessionStorage.removeItem('session');localStorage.removeItem('session')}
 async function doLogin(){
-  const username=$('loginUser').value.trim(),password=$('loginPass').value.trim();
-  if(!username||!password)return showLoginAlert('Kullanıcı adı ve şifre gerekli','error');
-  const{data,error}=await sb.from('users').select('*').eq('username',username).eq('password_hash',password).single();
-  if(error||!data)return showLoginAlert('Hatalı kullanıcı adı veya şifre','error');
-  currentUser=data;setSession(data);showApp();
+const username=$('loginUser').value.trim(),password=$('loginPass').value.trim();
+if(!username||!password)return showLoginAlert('Kullanıcı adı ve şifre gerekli','error');
+const{data,error}=await sb.from('users').select('*').eq('username',username).eq('password_hash',password).single();
+if(error||!data)return showLoginAlert('Hatalı kullanıcı adı veya şifre','error');
+currentUser=data;setSession(data);showApp();
 }
 function doLogout(){if(currentUser?.is_test_user)clearTestData();clearSession();currentUser=null;$('appShell').style.display='none';$('loginScreen').style.display='flex'}
 async function clearTestData(){const sid=currentUser.id+'_test';await sb.from('student_data').delete().eq('session_id',sid);await sb.from('attendance').delete().eq('session_id',sid);await sb.from('substitutions').delete().eq('session_id',sid)}
 function showLoginAlert(msg,type){$('loginAlert').innerHTML='<div class="alert alert-'+type+'">'+msg+'</div>'}
 window.addEventListener('DOMContentLoaded',()=>{const s=getSession();if(s){currentUser=s;showApp()}$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()})});
 function showApp(){
-  $('loginScreen').style.display='none';const shell=$('appShell');shell.style.display='flex';shell.style.flexDirection='column';shell.style.minHeight='100vh';
-  const badge={admin:'👑 Admin',idareci:'🏢 İdareci',bolum_baskani:'📋 Bölüm Başkanı',ogretmen:'👨‍🏫 Öğretmen',ofis_calisani:'💼 Ofis'}[currentUser.role]||currentUser.role;
-  $('userBadge').textContent=badge+' · '+currentUser.full_name;
-  $('welcomeName').textContent=currentUser.full_name+' — '+new Date().toLocaleDateString('tr-TR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  $('adminPanel').style.display=isAdmin()?'block':'none';navigate('dashboard');
+$('loginScreen').style.display='none';const shell=$('appShell');shell.style.display='flex';shell.style.flexDirection='column';shell.style.minHeight='100vh';
+const badge={admin:'👑 Admin',idareci:'🏢 İdareci',bolum_baskani:'📋 Bölüm Başkanı',ogretmen:'👨‍🏫 Öğretmen',ofis_calisani:'💼 Ofis'}[currentUser.role]||currentUser.role;
+$('userBadge').textContent=badge+' · '+currentUser.full_name;
+$('welcomeName').textContent=currentUser.full_name+' — '+new Date().toLocaleDateString('tr-TR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+$('adminPanel').style.display=isAdmin()?'block':'none';navigate('dashboard');
 }
 function navigate(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const el=$('pg-'+page);if(el){el.classList.add('active');window.scrollTo(0,0)}
-  if(page==='students')showStudentTab('list');if(page==='attendance'){showAttendanceTab('take');const cb=$('csvDownloadBtn');if(cb)cb.style.display=canDownloadCSV()?'':'none'}if(page==='teachers')initTeacherPage();if(page==='admin-users')loadAdminUsers();if(page==='schedule-config')loadScheduleConfig()}
+if(page==='students')showStudentTab('list');if(page==='attendance'){showAttendanceTab('take');const cb=$('csvDownloadBtn');if(cb)cb.style.display=canDownloadCSV()?'':'none'}if(page==='teachers')initTeacherPage();if(page==='admin-users')loadAdminUsers();if(page==='schedule-config')loadScheduleConfig()}
 function $(id){return document.getElementById(id)}
 function html(id,h){$(id).innerHTML=h}
 function showModal(content){$('modalContent').innerHTML=content;$('modalBg').classList.add('show')}
@@ -191,42 +209,45 @@ function today(){return new Date().toISOString().split('T')[0]}
 function isAdmin(){return currentUser?.role==='admin'}
 function canSubstitute(){return['admin','idareci','bolum_baskani'].includes(currentUser?.role)}
 function canDownloadCSV(){const allowed=['atil.celik@pirireis.k12.tr','tuba.sarac@pirireis.k12.tr','mert.pala@pirireis.k12.tr','caner.karamanli@pirireis.k12.tr'];return isAdmin()||allowed.includes(currentUser?.email)}
-function esc(s){return String(s).replace(/'/g,"\\'")}
+function canOpinion(){return['admin','ogretmen','idareci','bolum_baskani'].includes(currentUser?.role)}
+function canViewAllOpinions(){return['admin','idareci'].includes(currentUser?.role)}
+function canViewDeptOpinions(){return currentUser?.role==='bolum_baskani'}
+function esc(s){return String(s).replace(/'/g,"\'")}
 
 // ===== STUDENTS =====
 async function showStudentTab(tab){
-  const c=$('student-content');
-  if(tab==='list'){
-    c.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yükleniyor...</div>';
-    const{data:students}=await sb.from('students').select('*, classes(class_name, id)').order('full_name');
-    const{data:classes}=await sb.from('classes').select('*').order('id');
-    let fOpts='<option value="">Tümü</option>'+(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
-    let h='<div class="card"><div class="card-header"><span class="card-title">Öğrenciler ('+(students?.length||0)+')</span></div>';
-    h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div class="search-box" style="flex:1;margin:0;min-width:200px"><input type="text" class="form-input" placeholder="Ara..." oninput="filterRows(this.value,\'student-tr\')"></div>';
-    h+='<select class="form-input" style="width:auto" onchange="filterClass(this.value)">'+fOpts+'</select></div>';
-    h+='<div class="table-wrap"><table><thead><tr><th>No</th><th>Ad Soyad</th><th>Sınıf</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';
-    (students||[]).forEach(s=>{
-      h+='<tr class="student-tr" data-class="'+(s.classes?.id||'')+'">';
-      h+='<td>'+s.student_number+'</td><td>'+s.full_name+'</td><td>'+(s.classes?.class_name||'-')+'</td>';
-      if(isAdmin()) h+='<td><button class="btn btn-xs btn-secondary" onclick="editStudentModal('+s.id+',\''+esc(s.full_name)+'\',\''+s.student_number+'\','+(s.class_id||'null')+')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteStudent('+s.id+',\''+esc(s.full_name)+'\')">Sil</button></td>';
-      h+='</tr>';
-    });
-    h+='</tbody></table></div></div>';c.innerHTML=h;
-  } else if(tab==='add'){
-    const{data:classes}=await sb.from('classes').select('*').order('id');
-    let opts=(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
-    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Ekle</div><div id="addStudentAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="sName" class="form-input"></div><div class="form-group"><label>Okul Numarası</label><input id="sNumber" class="form-input"></div><div class="form-group"><label>Sınıf</label><select id="sClass" class="form-input"><option value="">Seçin</option>'+opts+'</select></div><button class="btn btn-primary" onclick="addStudent()">Ekle</button></div><div class="card"><div class="card-title" style="margin-bottom:16px">Toplu Yükleme (CSV)</div><p style="font-size:13px;color:var(--text2);margin-bottom:12px">Format: ad_soyad,okul_no,sinif_id</p><textarea id="csvData" class="form-input" rows="5" placeholder="AHMET YILMAZ,201,1"></textarea><button class="btn btn-secondary" onclick="bulkAddStudents()" style="margin-top:12px">Toplu Ekle</button></div>';
-  } else if(tab==='data-entry'){
-    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-    const{data:students}=await sb.from('students').select('*').order('full_name');
-    let tO=(teachers||[]).map(t=>'<option value="'+t.id+'" data-branch="'+t.branch+'">'+t.full_name+' ('+t.branch+')</option>').join('');
-    let sO=(students||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' ('+s.student_number+')</option>').join('');
-    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Veri Girişi</div><div id="dataEntryAlert"></div><div class="form-group"><label>Tarih</label><input id="deDate" type="date" class="form-input" value="'+today()+'"></div><div class="form-group"><label>Öğretmen</label><select id="deTeacher" class="form-input" onchange="updateBranch()"><option value="">Seçin</option>'+tO+'</select></div><div class="form-group"><label>Branş</label><input id="deBranch" class="form-input" readonly></div><div class="form-group"><label>Öğrenci</label><select id="deStudent" class="form-input"><option value="">Seçin</option>'+sO+'</select></div><div class="form-group"><label>Veri Türü</label><select id="deType" class="form-input"><option value="">Seçin</option><option>Akademik Başarı</option><option>Davranış</option><option>Sosyal Gelişim</option><option>Katılım</option><option>Proje/Ödev</option><option>Sınav Sonucu</option><option>Görüşme Notu</option><option>Diğer</option></select></div><div class="form-group"><label>Açıklama</label><textarea id="deDesc" class="form-input" placeholder="Detaylı açıklama..."></textarea></div><button class="btn btn-primary" onclick="saveDataEntry()">Kaydet</button></div>';
-  } else if(tab==='report'){
-    const{data:students}=await sb.from('students').select('*, classes(class_name)').order('full_name');
-    let sO=(students||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' — '+(s.classes?.class_name||'')+'</option>').join('');
-    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Raporu</div><div class="form-group"><label>Öğrenci</label><select id="repStudent" class="form-input"><option value="">Seçin</option>'+sO+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Başlangıç</label><input id="repFrom" type="date" class="form-input"></div><div class="form-group" style="flex:1"><label>Bitiş</label><input id="repTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="generateStudentReport()">Rapor Oluştur</button></div><div id="reportResult"></div>';
-  }
+const c=$('student-content');
+if(tab==='list'){
+c.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yükleniyor…</div>';
+const{data:students}=await sb.from('students').select('*, classes(class_name, id)').order('full_name');
+const{data:classes}=await sb.from('classes').select('*').order('id');
+let fOpts='<option value="">Tümü</option>'+(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
+let h='<div class="card"><div class="card-header"><span class="card-title">Öğrenciler ('+(students?.length||0)+')</span></div>';
+h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div class="search-box" style="flex:1;margin:0;min-width:200px"><input type="text" class="form-input" placeholder="Ara..." oninput="filterRows(this.value,\'student-tr\')"></div>';
+h+='<select class="form-input" style="width:auto" onchange="filterClass(this.value)">'+fOpts+'</select></div>';
+h+='<div class="table-wrap"><table><thead><tr><th>No</th><th>Ad Soyad</th><th>Sınıf</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';
+(students||[]).forEach(s=>{
+h+='<tr class="student-tr" data-class="'+(s.classes?.id||'')+'">';
+h+='<td>'+s.student_number+'</td><td>'+s.full_name+'</td><td>'+(s.classes?.class_name||'-')+'</td>';
+if(isAdmin()) h+='<td><button class="btn btn-xs btn-secondary" onclick="editStudentModal('+s.id+',\''+esc(s.full_name)+'\',\''+s.student_number+'\','+(s.class_id||'null')+')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteStudent('+s.id+',\''+esc(s.full_name)+'\')">Sil</button></td>';
+h+='</tr>';
+});
+h+='</tbody></table></div></div>';c.innerHTML=h;
+} else if(tab==='add'){
+const{data:classes}=await sb.from('classes').select('*').order('id');
+let opts=(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
+c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Ekle</div><div id="addStudentAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="sName" class="form-input"></div><div class="form-group"><label>Okul Numarası</label><input id="sNumber" class="form-input"></div><div class="form-group"><label>Sınıf</label><select id="sClass" class="form-input"><option value="">Seçin</option>'+opts+'</select></div><button class="btn btn-primary" onclick="addStudent()">Ekle</button></div><div class="card"><div class="card-title" style="margin-bottom:16px">Toplu Yükleme (CSV)</div><p style="font-size:13px;color:var(--text2);margin-bottom:12px">Format: ad_soyad,okul_no,sinif_id</p><textarea id="csvData" class="form-input" rows="5" placeholder="AHMET YILMAZ,201,1"></textarea><button class="btn btn-secondary" onclick="bulkAddStudents()" style="margin-top:12px">Toplu Ekle</button></div>';
+} else if(tab==='data-entry'){
+const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+const{data:students}=await sb.from('students').select('*').order('full_name');
+let tO=(teachers||[]).map(t=>'<option value="'+t.id+'" data-branch="'+t.branch+'">'+t.full_name+' ('+t.branch+')</option>').join('');
+let sO=(students||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' ('+s.student_number+')</option>').join('');
+c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Veri Girişi</div><div id="dataEntryAlert"></div><div class="form-group"><label>Tarih</label><input id="deDate" type="date" class="form-input" value="'+today()+'"></div><div class="form-group"><label>Öğretmen</label><select id="deTeacher" class="form-input" onchange="updateBranch()"><option value="">Seçin</option>'+tO+'</select></div><div class="form-group"><label>Branş</label><input id="deBranch" class="form-input" readonly></div><div class="form-group"><label>Öğrenci</label><select id="deStudent" class="form-input"><option value="">Seçin</option>'+sO+'</select></div><div class="form-group"><label>Veri Türü</label><select id="deType" class="form-input"><option value="">Seçin</option><option>Akademik Başarı</option><option>Davranış</option><option>Sosyal Gelişim</option><option>Katılım</option><option>Proje/Ödev</option><option>Sınav Sonucu</option><option>Görüşme Notu</option><option>Diğer</option></select></div><div class="form-group"><label>Açıklama</label><textarea id="deDesc" class="form-input" placeholder="Detaylı açıklama..."></textarea></div><button class="btn btn-primary" onclick="saveDataEntry()">Kaydet</button></div>';
+} else if(tab==='report'){
+const{data:students}=await sb.from('students').select('*, classes(class_name)').order('full_name');
+let sO=(students||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' — '+(s.classes?.class_name||'')+'</option>').join('');
+c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Raporu</div><div class="form-group"><label>Öğrenci</label><select id="repStudent" class="form-input"><option value="">Seçin</option>'+sO+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Başlangıç</label><input id="repFrom" type="date" class="form-input"></div><div class="form-group" style="flex:1"><label>Bitiş</label><input id="repTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="generateStudentReport()">Rapor Oluştur</button></div><div id="reportResult"></div>';
+}
 }
 function filterRows(q,cls){q=q.toLowerCase();document.querySelectorAll('.'+cls).forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none'})}
 function filterClass(cid){document.querySelectorAll('.student-tr').forEach(tr=>{tr.style.display=(!cid||tr.dataset.class===cid)?'':'none'})}
@@ -251,24 +272,24 @@ async function genAttReport(){const sid=$('arSt').value,from=$('arFrom').value,t
 
 // ===== CSV DOWNLOAD =====
 async function downloadAttCSV(){
-  const classId=$('csvClass').value,from=$('csvFrom').value,to=$('csvTo').value;
-  if(!from||!to)return html('csvAlert','<div class="alert alert-error">Tarih aralığı seçin</div>');
-  html('csvAlert','<div class="loading-overlay"><div class="spinner"></div> Veriler hazırlanıyor...</div>');
-  let q=sb.from('attendance').select('*, students(full_name,student_number), classes(class_name)');
-  if(classId)q=q.eq('class_id',classId);
-  q=q.gte('attendance_date',from).lte('attendance_date',to);
-  const{data,error}=await q.order('attendance_date').order('student_id');
-  if(error)return html('csvAlert','<div class="alert alert-error">'+error.message+'</div>');
-  if(!data?.length)return html('csvAlert','<div class="alert alert-info">Bu tarih aralığında yoklama kaydı bulunamadı</div>');
-  const statusTR={present:'Geldi',absent:'Gelmedi',late:'Geç Kaldı'};
-  let csv='\uFEFF"Tarih","Öğrenci No","Öğrenci Adı","Sınıf","Durum","Geç Kalma Saati"\n';
-  data.forEach(r=>{csv+='"'+r.attendance_date+'","'+r.students.student_number+'","'+r.students.full_name+'","'+(r.classes?.class_name||'-')+'","'+(statusTR[r.status]||r.status)+'","'+(r.late_time||'-')+'"\n'});
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='yoklama_'+from+'_'+to+'.csv';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-  html('csvAlert','<div class="alert alert-success">'+data.length+' kayıt indirildi!</div>');
+const classId=$('csvClass').value,from=$('csvFrom').value,to=$('csvTo').value;
+if(!from||!to)return html('csvAlert','<div class="alert alert-error">Tarih aralığı seçin</div>');
+html('csvAlert','<div class="loading-overlay"><div class="spinner"></div> Veriler hazırlanıyor…</div>');
+let q=sb.from('attendance').select('*, students(full_name,student_number), classes(class_name)');
+if(classId)q=q.eq('class_id',classId);
+q=q.gte('attendance_date',from).lte('attendance_date',to);
+const{data,error}=await q.order('attendance_date').order('student_id');
+if(error)return html('csvAlert','<div class="alert alert-error">'+error.message+'</div>');
+if(!data?.length)return html('csvAlert','<div class="alert alert-info">Bu tarih aralığında yoklama kaydı bulunamadı</div>');
+const statusTR={present:'Geldi',absent:'Gelmedi',late:'Geç Kaldı'};
+let csv='\uFEFF"Tarih","Öğrenci No","Öğrenci Adı","Sınıf","Durum","Geç Kalma Saati"\n';
+data.forEach(r=>{csv+='"'+r.attendance_date+'","'+r.students.student_number+'","'+r.students.full_name+'","'+(r.classes?.class_name||'-')+'","'+(statusTR[r.status]||r.status)+'","'+(r.late_time||'-')+'"\n'});
+const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;a.download='yoklama_'+from+'_'+to+'.csv';
+document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+html('csvAlert','<div class="alert alert-success">'+data.length+' kayıt indirildi!</div>');
 }
 
 // ===== TEACHERS =====
@@ -276,31 +297,31 @@ let curSchedTid=null;
 function initTeacherPage(){const nav=$('teacherNav');let b='';if(isAdmin()){b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'list\')">Öğretmenler</button><button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'add\')">Ekle</button><button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'schedule\')">Program</button>'}if(canSubstitute())b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'substitute\')">Vekil Atama</button>';b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'report\')">Rapor</button>';nav.innerHTML=b;showTeacherTab(isAdmin()?'list':canSubstitute()?'substitute':'report')}
 
 async function showTeacherTab(tab){
-  const c=$('teacher-content');
-  if(tab==='list'){
-    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-    let h='<div class="card"><div class="card-header"><span class="card-title">Öğretmenler</span></div><div class="table-wrap"><table><thead><tr><th>Ad Soyad</th><th>Branş</th><th>Email</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';
-    (teachers||[]).forEach(t=>{h+='<tr><td>'+t.full_name+'</td><td>'+t.branch+'</td><td>'+(t.email||'-')+'</td>';if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editTeacherModal('+t.id+',\''+esc(t.full_name)+'\',\''+esc(t.branch)+'\',\''+esc(t.email||'')+'\')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteTeacher('+t.id+',\''+esc(t.full_name)+'\')">Sil</button></td>';h+='</tr>'});
-    h+='</tbody></table></div></div>';c.innerHTML=h;
-  } else if(tab==='add'){
-    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Ekle</div><div id="addTeacherAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="tName" class="form-input"></div><div class="form-group"><label>Branş</label><input id="tBranch" class="form-input"></div><div class="form-group"><label>Email</label><input id="tEmail" class="form-input" type="email"></div><button class="btn btn-primary" onclick="addTeacher()">Ekle</button></div>';
-  } else if(tab==='schedule'){
-    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-    let o=(teachers||[]).map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');
-    c.innerHTML='<div class="card"><div class="card-header"><span class="card-title">Haftalık Ders Programı</span>'+(isAdmin()?'<button class="btn btn-sm btn-primary" onclick="addLessonModal()">+ Ders Ekle</button>':'')+'</div><div class="form-group"><label>Öğretmen</label><select id="schedTeacher" class="form-input" onchange="loadSched()"><option value="">Seçin</option>'+o+'</select></div><div id="schedGrid"></div></div>';
-  } else if(tab==='substitute'){
-    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-    let o=(teachers||[]).map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');
-    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Vekil Öğretmen Atama</div><div id="subAlert"></div><div class="form-group"><label>Gelmeyen Öğretmen</label><select id="subAbsent" class="form-input" onchange="loadAbsSched()"><option value="">Seçin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="subDate" type="date" class="form-input" value="'+today()+'" onchange="loadAbsSched()"></div><div id="subSchedule"></div></div><div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Geçmiş Atamalar</div><div id="subHistory"></div></div>';loadSubHist();
-  } else if(tab==='report'){
-    c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
-    const{data:subs}=await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('substitution_date',{ascending:false});
-    const am={},sm={};(subs||[]).forEach(s=>{am[s.absent?.full_name]=(am[s.absent?.full_name]||0)+1;sm[s.sub?.full_name]=(sm[s.sub?.full_name]||0)+1});
-    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-    let h='<div class="card"><div class="card-title" style="margin-bottom:16px">Rapor</div><div class="stats-row"><div class="stat-card"><div class="val">'+(subs?.length||0)+'</div><div class="label">Toplam Vekil</div></div></div><div class="table-wrap"><table><thead><tr><th>Öğretmen</th><th>Gelmediği</th><th>Vekil Olduğu</th></tr></thead><tbody>';
-    (teachers||[]).forEach(t=>{h+='<tr><td>'+t.full_name+'</td><td style="color:var(--red)">'+(am[t.full_name]||0)+'</td><td style="color:var(--green)">'+(sm[t.full_name]||0)+'</td></tr>'});
-    h+='</tbody></table></div></div>';c.innerHTML=h;
-  }
+const c=$('teacher-content');
+if(tab==='list'){
+const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+let h='<div class="card"><div class="card-header"><span class="card-title">Öğretmenler</span></div><div class="table-wrap"><table><thead><tr><th>Ad Soyad</th><th>Branş</th><th>Email</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';
+(teachers||[]).forEach(t=>{h+='<tr><td>'+t.full_name+'</td><td>'+t.branch+'</td><td>'+(t.email||'-')+'</td>';if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editTeacherModal('+t.id+',\''+esc(t.full_name)+'\',\''+esc(t.branch)+'\',\''+esc(t.email||'')+'\')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteTeacher('+t.id+',\''+esc(t.full_name)+'\')">Sil</button></td>';h+='</tr>'});
+h+='</tbody></table></div></div>';c.innerHTML=h;
+} else if(tab==='add'){
+c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Ekle</div><div id="addTeacherAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="tName" class="form-input"></div><div class="form-group"><label>Branş</label><input id="tBranch" class="form-input"></div><div class="form-group"><label>Email</label><input id="tEmail" class="form-input" type="email"></div><button class="btn btn-primary" onclick="addTeacher()">Ekle</button></div>';
+} else if(tab==='schedule'){
+const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+let o=(teachers||[]).map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');
+c.innerHTML='<div class="card"><div class="card-header"><span class="card-title">Haftalık Ders Programı</span>'+(isAdmin()?'<button class="btn btn-sm btn-primary" onclick="addLessonModal()">+ Ders Ekle</button>':'')+'</div><div class="form-group"><label>Öğretmen</label><select id="schedTeacher" class="form-input" onchange="loadSched()"><option value="">Seçin</option>'+o+'</select></div><div id="schedGrid"></div></div>';
+} else if(tab==='substitute'){
+const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+let o=(teachers||[]).map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');
+c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Vekil Öğretmen Atama</div><div id="subAlert"></div><div class="form-group"><label>Gelmeyen Öğretmen</label><select id="subAbsent" class="form-input" onchange="loadAbsSched()"><option value="">Seçin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="subDate" type="date" class="form-input" value="'+today()+'" onchange="loadAbsSched()"></div><div id="subSchedule"></div></div><div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Geçmiş Atamalar</div><div id="subHistory"></div></div>';loadSubHist();
+} else if(tab==='report'){
+c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+const{data:subs}=await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('substitution_date',{ascending:false});
+const am={},sm={};(subs||[]).forEach(s=>{am[s.absent?.full_name]=(am[s.absent?.full_name]||0)+1;sm[s.sub?.full_name]=(sm[s.sub?.full_name]||0)+1});
+const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+let h='<div class="card"><div class="card-title" style="margin-bottom:16px">Rapor</div><div class="stats-row"><div class="stat-card"><div class="val">'+(subs?.length||0)+'</div><div class="label">Toplam Vekil</div></div></div><div class="table-wrap"><table><thead><tr><th>Öğretmen</th><th>Gelmediği</th><th>Vekil Olduğu</th></tr></thead><tbody>';
+(teachers||[]).forEach(t=>{h+='<tr><td>'+t.full_name+'</td><td style="color:var(--red)">'+(am[t.full_name]||0)+'</td><td style="color:var(--green)">'+(sm[t.full_name]||0)+'</td></tr>'});
+h+='</tbody></table></div></div>';c.innerHTML=h;
+}
 }
 async function addTeacher(){const n=$('tName').value.trim(),b=$('tBranch').value.trim(),e=$('tEmail').value.trim();if(!n||!b)return html('addTeacherAlert','<div class="alert alert-error">Ad ve branş gerekli</div>');const{error}=await sb.from('teachers').insert({full_name:n,branch:b,email:e||null});if(error)return html('addTeacherAlert','<div class="alert alert-error">'+error.message+'</div>');html('addTeacherAlert','<div class="alert alert-success">Eklendi!</div>');$('tName').value='';$('tBranch').value='';$('tEmail').value=''}
 function editTeacherModal(id,name,branch,email){showModal('<h3>Öğretmen Düzenle</h3><div id="etAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="etName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Branş</label><input id="etBranch" class="form-input" value="'+branch+'"></div><div class="form-group"><label>Email</label><input id="etEmail" class="form-input" value="'+email+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateTeacher('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
@@ -337,6 +358,384 @@ async function addPeriod(){const n=parseInt($('pNum').value),s=$('pStart').value
 function editPeriodModal(id,num,start,end){showModal('<h3>'+num+'. Ders Düzenle</h3><div class="form-group"><label>Başlangıç</label><input id="epS" type="time" class="form-input" value="'+start+'"></div><div class="form-group"><label>Bitiş</label><input id="epE" type="time" class="form-input" value="'+end+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updPeriod('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
 async function updPeriod(id){await sb.from('schedule_config').update({start_time:$('epS').value,end_time:$('epE').value}).eq('id',id);closeModal();loadScheduleConfig()}
 async function delPeriod(id){if(!confirm('Silinecek?'))return;await sb.from('schedule_config').delete().eq('id',id);loadScheduleConfig()}
+
+
+// ===== GEMINI API =====
+const GEMINI_API_KEY='AIzaSyBFqY_7TDc0ejkN5naYTubzgzjZR4UWOEU';
+async function geminiTranslate(text,fromLang,toLang){
+try{
+const prompt=fromLang==='tr'?
+'Asagidaki Turkce metni Fransizcaya cevir. Sadece ceviriyi yaz, baska bir sey ekleme:\n\n'+text:
+'Traduis le texte suivant du francais au turc. Ecris uniquement la traduction, rien d\'autre:\n\n'+text;
+const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
+method:'POST',headers:{'Content-Type':'application/json'},
+body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+});
+const data=await resp.json();
+return data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}catch(e){console.error('Gemini error:',e);return ''}
+}
+
+async function geminiSummarize(opinionsText,studentName){
+try{
+const prompt='Asagida '+studentName+' isimli ogrenci hakkinda farkli ogretmenlerin yazdigi gorusler bulunmaktadir. Bu gorusleri tek bir paragrafta Turkce olarak ozetle. Ogrencinin guclu yonlerini, gelisim alanlarini ve genel durumunu belirt:\n\n'+opinionsText;
+const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
+method:'POST',headers:{'Content-Type':'application/json'},
+body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+});
+const data=await resp.json();
+return data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}catch(e){console.error('Gemini summarize error:',e);return ''}
+}
+
+// ===== TEACHER-CLASS MAPPING =====
+const TEACHER_CLASS_MAP={
+'Nurgul DURSUN KIRKAR':['A','B','C','D'],
+'Atil CELIK':['A','B','C','D'],
+'Walid DZIRI':['A','B','C','D'],
+'SABA ARAFA':['A','B','C','D'],
+'Ayda AKSOY PATIL':['A','B','C','D'],
+'Gokcem OZALAKUS':['A','C','D'],
+'Yigit Can AKYUZ':['B','C','D'],
+'Nicolas ROUVRAY':['A','B','C','D'],
+'Linda LAOUINI':['A','D'],
+'Lucie GRANIER':['B','C'],
+'Bilge AYKUT':['A','B','C','D'],
+'Burcu ATES':['A','B','C','D'],
+'Levent YIMSEL':['A','B','C','D']
+};
+
+// ===== OPINIONS SYSTEM =====
+async function initOpinionsPage(){
+var nav=$('opinionsNav');
+var b='';
+if(canOpinion())b+='<button class="btn btn-secondary btn-sm" onclick="showOpinionTab(\'write\')">Gorus Yaz</button>';
+if(canOpinion())b+='<button class="btn btn-secondary btn-sm" onclick="showOpinionTab(\'my-opinions\')">Goruslerim</button>';
+if(canViewAllOpinions()||canViewDeptOpinions())b+='<button class="btn btn-secondary btn-sm" onclick="showOpinionTab(\'all\')">Tum Gorusler</button>';
+if(canViewAllOpinions())b+='<button class="btn btn-secondary btn-sm" onclick="showOpinionTab(\'download\')">Indir</button>';
+nav.innerHTML=b;
+showOpinionTab(canOpinion()?'write':'all');
+}
+
+async function showOpinionTab(tab){
+var c=$('opinions-content');
+if(tab==='write'){
+c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+var teacherName=currentUser.full_name;
+var mappedSections=[];
+// Try exact match first, then try normalized
+for(var key in TEACHER_CLASS_MAP){
+if(teacherName.toUpperCase().indexOf(key.split(' ')[0].toUpperCase())>=0 && teacherName.toUpperCase().indexOf(key.split(' ').pop().toUpperCase())>=0){
+mappedSections=TEACHER_CLASS_MAP[key];break;
+}
+}
+var classInfos=new Set(mappedSections);
+var teacherRec=null;
+var tRes=await sb.from('teachers').select('*').ilike('full_name','%'+teacherName.split(' ')[0]+'%');
+if(tRes.data&&tRes.data.length)teacherRec=tRes.data[0];
+if(teacherRec){
+var schedRes=await sb.from('teacher_schedule').select('class_info').eq('teacher_id',teacherRec.id);
+(schedRes.data||[]).forEach(function(s){
+var ci=s.class_info;
+if(ci){
+if(ci.indexOf('-')>=0){ci.split('-').forEach(function(p){p=p.trim();if(p)classInfos.add(p)})}
+else classInfos.add(ci);
+}
+});
+}
+if(isAdmin()||canViewAllOpinions()){classInfos=new Set(['A','B','C','D'])}
+var clsRes=await sb.from('classes').select('*').order('id');
+var matchingClasses=(clsRes.data||[]).filter(function(cl){
+var parts=cl.class_name.split('-');
+var section=parts.length>1?parts[1].trim():parts[0].trim();
+return classInfos.has(section);
+});
+var classOpts=matchingClasses.map(function(cl){return'<option value="'+cl.id+'" data-name="'+cl.class_name+'">'+cl.class_name+'</option>'}).join('');
+var periods=['2024-2025 Guz','2024-2025 Bahar','2025-2026 Guz','2025-2026 Bahar'];
+var periodOpts=periods.map(function(p){return'<option value="'+p+'">'+p+'</option>'}).join('');
+var h='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogrenci Gorusu Yaz</div>';
+h+='<div id="opAlert"></div>';
+h+='<div style="display:flex;gap:12px;flex-wrap:wrap"><div class="form-group" style="flex:1;min-width:200px"><label>Sinif</label><select id="opClass" class="form-input" onchange="loadOpStudents()"><option value="">Secin</option>'+classOpts+'</select></div>';
+h+='<div class="form-group" style="flex:1;min-width:200px"><label>Donem</label><select id="opPeriod" class="form-input">'+periodOpts+'</select></div></div>';
+h+='<div id="opStudentSection"></div></div>';
+c.innerHTML=h;
+} else if(tab==='my-opinions'){
+c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+var teacherRec2=null;
+var tRes2=await sb.from('teachers').select('*').ilike('full_name','%'+currentUser.full_name.split(' ')[0]+'%');
+if(tRes2.data&&tRes2.data.length)teacherRec2=tRes2.data[0];
+var opinions=[];
+if(teacherRec2){
+var opRes=await sb.from('teacher_opinions').select('*, students(full_name,student_number)').eq('teacher_id',teacherRec2.id).order('created_at',{ascending:false});
+opinions=opRes.data||[];
+}
+if(isAdmin()&&!opinions.length){
+var opRes2=await sb.from('teacher_opinions').select('*, students(full_name,student_number)').order('created_at',{ascending:false}).limit(50);
+opinions=opRes2.data||[];
+}
+var h2='<div class="card"><div class="card-title" style="margin-bottom:16px">Yazdigim Gorusler ('+opinions.length+')</div>';
+if(!opinions.length){h2+='<p style="color:var(--text3);font-size:14px">Henuz gorus yazmadiniz.</p>'}
+else{
+var grouped={};
+opinions.forEach(function(op){
+var key=op.students?.full_name||'?';
+if(!grouped[key])grouped[key]=[];
+grouped[key].push(op);
+});
+Object.entries(grouped).forEach(function(entry){
+var name=entry[0],ops=entry[1];
+h2+='<div class="opinion-card"><div class="student-name">'+name+' <span class="opinion-badge archived">'+ops.length+' gorus</span></div>';
+ops.forEach(function(op){
+h2+='<div class="opinion-meta">'+new Date(op.created_at).toLocaleDateString('tr-TR')+' - '+(op.academic_period||'')+'</div>';
+if(op.opinion_tr)h2+='<div class="opinion-text tr"><strong>TR:</strong> '+op.opinion_tr+'</div>';
+if(op.opinion_fr)h2+='<div class="opinion-text fr"><strong>FR:</strong> '+op.opinion_fr+'</div>';
+});
+h2+='</div>';
+});
+}
+h2+='</div>';c.innerHTML=h2;
+} else if(tab==='all'){
+c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+var clsRes2=await sb.from('classes').select('*').order('id');
+var classOpts2=(clsRes2.data||[]).map(function(cl){return'<option value="'+cl.id+'" data-name="'+cl.class_name+'">'+cl.class_name+'</option>'}).join('');
+var h3='<div class="card"><div class="card-title" style="margin-bottom:16px">Tum Ogretmen Gorusleri</div>';
+h3+='<div class="form-group"><label>Sinif Secin</label><select id="opAllClass" class="form-input" onchange="loadAllOpinions()"><option value="">Tumu</option>'+classOpts2+'</select></div>';
+h3+='<div id="allOpinionsList"></div></div>';
+c.innerHTML=h3;
+loadAllOpinions();
+} else if(tab==='download'){
+var clsRes3=await sb.from('classes').select('*').order('id');
+var classOpts3=(clsRes3.data||[]).map(function(cl){return'<option value="'+cl.class_name+'">'+cl.class_name+'</option>'}).join('');
+var h4='<div class="card"><div class="card-title" style="margin-bottom:16px">Gorusleri Indir</div>';
+h4+='<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Sinif bazli ogretmen goruslerini indirin. Her ogrenci icin tum derslerin gorusleri ve Gemini ozeti dahil edilir.</p>';
+h4+='<div id="dlAlert"></div>';
+h4+='<div class="form-group"><label>Sinif</label><select id="dlClass" class="form-input"><option value="">Secin</option>'+classOpts3+'</select></div>';
+h4+='<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="downloadOpinionsCSV()">Excel/CSV Indir</button>';
+h4+='<button class="btn btn-secondary" onclick="downloadOpinionsText()">Metin Indir</button></div></div>';
+c.innerHTML=h4;
+}
+}
+
+async function loadOpStudents(){
+var cid=$('opClass').value;
+var sec=$('opStudentSection');
+if(!cid){sec.innerHTML='';return}
+sec.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+var stRes=await sb.from('students').select('*').eq('class_id',cid).order('full_name');
+var students=stRes.data;
+if(!students||!students.length){sec.innerHTML='<div class="alert alert-info">Bu sinifta ogrenci yok</div>';return}
+var h='<div style="margin-top:16px">';
+students.forEach(function(s){
+h+='<div class="opinion-card" id="op-card-'+s.id+'">';
+h+='<div class="student-name">'+s.full_name+' <span class="number">'+s.student_number+'</span></div>';
+h+='<div class="form-group" style="margin-top:8px"><label>Gorusunuz (Turkce veya Fransizca yazabilirsiniz)</label>';
+h+='<textarea id="op-text-'+s.id+'" class="form-input" rows="3" placeholder="Ogrenci hakkinda gorusunuzu yazin..."></textarea></div>';
+h+='<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-sm btn-primary" onclick="saveOpinion('+s.id+')">Kaydet & Cevir</button>';
+h+='<span id="op-status-'+s.id+'" style="font-size:12px;color:var(--text3)"></span></div>';
+h+='<div id="op-result-'+s.id+'" style="margin-top:8px"></div>';
+h+='<div id="op-history-'+s.id+'" style="margin-top:8px"></div>';
+h+='<button class="btn btn-xs btn-secondary" onclick="loadOpHistory('+s.id+')" style="margin-top:4px;font-size:11px">Gecmis Gorusler</button>';
+h+='</div>';
+});
+h+='</div>';
+sec.innerHTML=h;
+}
+
+async function saveOpinion(studentId){
+var text=$('op-text-'+studentId).value.trim();
+if(!text)return alert('Gorus yazin');
+var period=$('opPeriod').value;
+var statusEl=$('op-status-'+studentId);
+var resultEl=$('op-result-'+studentId);
+statusEl.innerHTML='<span class="translation-loading"><div class="spinner"></div> Kaydediliyor ve cevriliyor...</span>';
+var isTurkish=/[\u00e7\u011f\u0131\u00f6\u015f\u00fc\u00c7\u011e\u0130\u00d6\u015e\u00dc]/.test(text)||/\b(ve|bir|bu|ile|olan|den|dan|ise)\b/i.test(text);
+var fromLang=isTurkish?'tr':'fr';
+var toLang=isTurkish?'fr':'tr';
+var translated=await geminiTranslate(text,fromLang,toLang);
+var opTr=fromLang==='tr'?text:translated;
+var opFr=fromLang==='fr'?text:translated;
+var teacherRec3=null;
+var tRes3=await sb.from('teachers').select('id,branch').ilike('full_name','%'+currentUser.full_name.split(' ')[0]+'%');
+if(tRes3.data&&tRes3.data.length)teacherRec3=tRes3.data[0];
+var className=$('opClass').options[$('opClass').selectedIndex]?.dataset?.name||'';
+var insertData={
+teacher_id:teacherRec3?.id||null,
+student_id:studentId,
+class_info:className,
+subject:teacherRec3?.branch||'',
+opinion_tr:opTr,
+opinion_fr:opFr,
+academic_period:period,
+session_id:currentUser.is_test_user?sessionId():null
+};
+var insRes=await sb.from('teacher_opinions').insert(insertData);
+if(insRes.error){
+statusEl.innerHTML='<span style="color:var(--red)">Hata: '+insRes.error.message+'</span>';
+return;
+}
+statusEl.innerHTML='<span style="color:var(--green)">Kaydedildi!</span>';
+$('op-text-'+studentId).value='';
+var rh='';
+if(opTr)rh+='<div class="opinion-text tr"><strong>TR:</strong> '+opTr+'</div>';
+if(opFr)rh+='<div class="opinion-text fr"><strong>FR:</strong> '+opFr+' <span class="gemini-badge">Gemini</span></div>';
+resultEl.innerHTML=rh;
+setTimeout(function(){statusEl.textContent=''},3000);
+}
+
+async function loadOpHistory(studentId){
+var el=$('op-history-'+studentId);
+if(el.dataset.loaded==='1'){el.style.display=el.style.display==='none'?'block':'none';return}
+el.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+var teacherRec4=null;
+var tRes4=await sb.from('teachers').select('id').ilike('full_name','%'+currentUser.full_name.split(' ')[0]+'%');
+if(tRes4.data&&tRes4.data.length)teacherRec4=tRes4.data[0];
+var q=sb.from('teacher_opinions').select('*').eq('student_id',studentId).order('created_at',{ascending:false});
+if(teacherRec4&&!isAdmin())q=q.eq('teacher_id',teacherRec4.id);
+var opRes3=await q;
+var opinions=opRes3.data||[];
+if(!opinions.length){el.innerHTML='<p style="font-size:12px;color:var(--text3);margin-top:4px">Gecmis gorus yok</p>';el.dataset.loaded='1';return}
+var h='<div style="border-top:1px solid var(--border2);padding-top:8px;margin-top:8px"><strong style="font-size:12px;color:var(--text2)">Gecmis ('+opinions.length+')</strong>';
+opinions.forEach(function(op){
+h+='<div style="margin-top:6px;padding:8px;background:var(--bg);border-radius:6px;font-size:13px">';
+h+='<div style="font-size:11px;color:var(--text3);margin-bottom:4px">'+new Date(op.created_at).toLocaleDateString('tr-TR')+' - '+(op.academic_period||'')+'</div>';
+if(op.opinion_tr)h+='<div style="margin-bottom:2px"><strong>TR:</strong> '+op.opinion_tr+'</div>';
+if(op.opinion_fr)h+='<div style="color:var(--accent)"><strong>FR:</strong> '+op.opinion_fr+'</div>';
+h+='</div>';
+});
+h+='</div>';
+el.innerHTML=h;
+el.dataset.loaded='1';
+}
+
+async function loadAllOpinions(){
+var cidEl=$('opAllClass');
+var cid=cidEl?cidEl.value:'';
+var el=$('allOpinionsList');
+if(!el)return;
+el.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+var q=sb.from('teacher_opinions').select('*, students(full_name,student_number,class_id), teachers:teacher_id(full_name,branch)').order('created_at',{ascending:false}).limit(200);
+if(cid){
+var csRes=await sb.from('students').select('id').eq('class_id',cid);
+var sids=(csRes.data||[]).map(function(s){return s.id});
+if(sids.length)q=q.in('student_id',sids);
+else{el.innerHTML='<div class="alert alert-info">Bu sinifta gorus yok</div>';return}
+}
+var opRes4=await q;
+var opinions=opRes4.data||[];
+if(!opinions.length){el.innerHTML='<div class="alert alert-info">Henuz gorus yok</div>';return}
+var grouped={};
+opinions.forEach(function(op){
+var sname=op.students?.full_name||'?';
+if(!grouped[sname])grouped[sname]={num:op.students?.student_number||'',ops:[]};
+grouped[sname].ops.push(op);
+});
+var h='<p style="font-size:13px;color:var(--text2);margin-bottom:12px">'+opinions.length+' gorus, '+Object.keys(grouped).length+' ogrenci</p>';
+Object.entries(grouped).sort(function(a,b){return a[0].localeCompare(b[0],'tr')}).forEach(function(entry){
+var name=entry[0],data=entry[1];
+h+='<div class="opinion-card"><div class="student-name">'+name+' <span class="number">'+data.num+'</span> <span class="opinion-badge archived">'+data.ops.length+' gorus</span></div>';
+data.ops.forEach(function(op){
+h+='<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px">';
+h+='<div class="opinion-meta">'+(op.teachers?.full_name||'?')+' ('+(op.teachers?.branch||'')+') - '+new Date(op.created_at).toLocaleDateString('tr-TR')+' - '+(op.academic_period||'')+'</div>';
+if(op.opinion_tr)h+='<div class="opinion-text tr" style="margin-top:4px"><strong>TR:</strong> '+op.opinion_tr+'</div>';
+if(op.opinion_fr)h+='<div class="opinion-text fr" style="margin-top:4px"><strong>FR:</strong> '+op.opinion_fr+'</div>';
+h+='</div>';
+});
+h+='</div>';
+});
+el.innerHTML=h;
+}
+
+async function downloadOpinionsCSV(){
+var className=$('dlClass').value;
+if(!className)return html('dlAlert','<div class="alert alert-error">Sinif secin</div>');
+html('dlAlert','<div class="loading-overlay"><div class="spinner"></div> Veriler hazirlaniyor ve ozetler olusturuluyor...</div>');
+var clsRes4=await sb.from('classes').select('*').eq('class_name',className).maybeSingle();
+if(!clsRes4.data){html('dlAlert','<div class="alert alert-error">Sinif bulunamadi</div>');return}
+var cls=clsRes4.data;
+var stRes2=await sb.from('students').select('*').eq('class_id',cls.id).order('full_name');
+var students=stRes2.data;
+if(!students||!students.length){html('dlAlert','<div class="alert alert-info">Bu sinifta ogrenci yok</div>');return}
+var sids=students.map(function(s){return s.id});
+var opRes5=await sb.from('teacher_opinions').select('*, teachers:teacher_id(full_name,branch)').in('student_id',sids).order('created_at',{ascending:false});
+var opinions=opRes5.data||[];
+var byStudent={};
+students.forEach(function(s){byStudent[s.id]={name:s.full_name,num:s.student_number,ops:[]}});
+opinions.forEach(function(op){if(byStudent[op.student_id])byStudent[op.student_id].ops.push(op)});
+var csv='\uFEFF"Ogrenci No","Ogrenci Adi","Sinif","Ogretmen","Brans","Donem","Gorus (TR)","Gorus (FR)","Gemini Ozet"\n';
+for(var i=0;i<sids.length;i++){
+var sid=sids[i];
+var st=byStudent[sid];
+if(!st.ops.length){
+csv+='"'+st.num+'","'+st.name+'","'+className+'","","","","Gorus yok","",""\n';
+continue;
+}
+var summaryInput='';
+st.ops.forEach(function(op){summaryInput+=(op.teachers?.full_name||'?')+' ('+(op.teachers?.branch||'')+'): '+(op.opinion_tr||op.opinion_fr||'')+'\n\n'});
+var summary='';
+try{summary=await geminiSummarize(summaryInput,st.name)}catch(e){summary='Ozet olusturulamadi'}
+st.ops.forEach(function(op,j){
+var tr=(op.opinion_tr||'').replace(/"/g,'""');
+var fr=(op.opinion_fr||'').replace(/"/g,'""');
+var sm=j===0?summary.replace(/"/g,'""'):'';
+csv+='"'+st.num+'","'+st.name+'","'+className+'","'+(op.teachers?.full_name||'')+'","'+(op.teachers?.branch||'')+'","'+(op.academic_period||'')+'","'+tr+'","'+fr+'","'+sm+'"\n';
+});
+}
+var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+var url=URL.createObjectURL(blob);
+var a=document.createElement('a');
+a.href=url;a.download='gorusler_'+className.replace(/\s+/g,'_')+'_'+today()+'.csv';
+document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+html('dlAlert','<div class="alert alert-success">'+sids.length+' ogrenci icin gorusler indirildi!</div>');
+}
+
+async function downloadOpinionsText(){
+var className=$('dlClass').value;
+if(!className)return html('dlAlert','<div class="alert alert-error">Sinif secin</div>');
+html('dlAlert','<div class="loading-overlay"><div class="spinner"></div> Metin dosyasi hazirlaniyor...</div>');
+var clsRes5=await sb.from('classes').select('*').eq('class_name',className).maybeSingle();
+if(!clsRes5.data){html('dlAlert','<div class="alert alert-error">Sinif bulunamadi</div>');return}
+var cls=clsRes5.data;
+var stRes3=await sb.from('students').select('*').eq('class_id',cls.id).order('full_name');
+var students=stRes3.data;
+if(!students||!students.length){html('dlAlert','<div class="alert alert-info">Bu sinifta ogrenci yok</div>');return}
+var sids=students.map(function(s){return s.id});
+var opRes6=await sb.from('teacher_opinions').select('*, teachers:teacher_id(full_name,branch)').in('student_id',sids).order('created_at',{ascending:false});
+var opinions=opRes6.data||[];
+var byStudent={};
+students.forEach(function(s){byStudent[s.id]={name:s.full_name,num:s.student_number,ops:[]}});
+opinions.forEach(function(op){if(byStudent[op.student_id])byStudent[op.student_id].ops.push(op)});
+var txt='SUBE OGRETMENLER KURULU - '+className+'\n';
+txt+='Tarih: '+new Date().toLocaleDateString('tr-TR')+'\n';
+txt+='============================================================\n\n';
+for(var i=0;i<sids.length;i++){
+var sid=sids[i];
+var st=byStudent[sid];
+txt+=st.name+' (No: '+st.num+')\n';
+txt+='----------------------------------------\n';
+if(!st.ops.length){txt+='Gorus bulunmamaktadir.\n\n';continue}
+st.ops.forEach(function(op){
+txt+='  '+(op.teachers?.full_name||'?')+' ('+(op.teachers?.branch||'')+') - '+(op.academic_period||'')+'\n';
+if(op.opinion_tr)txt+='  [TR] '+op.opinion_tr+'\n';
+if(op.opinion_fr)txt+='  [FR] '+op.opinion_fr+'\n';
+txt+='\n';
+});
+var summaryInput='';
+st.ops.forEach(function(op){summaryInput+=(op.teachers?.full_name||'?')+': '+(op.opinion_tr||op.opinion_fr||'')+'\n\n'});
+try{
+var summary=await geminiSummarize(summaryInput,st.name);
+txt+='  GEMINI OZET: '+summary+'\n';
+}catch(e){txt+='  Ozet olusturulamadi\n'}
+txt+='\n============================================================\n\n';
+}
+var blob=new Blob([txt],{type:'text/plain;charset=utf-8;'});
+var url=URL.createObjectURL(blob);
+var a=document.createElement('a');
+a.href=url;a.download='gorusler_'+className.replace(/\s+/g,'_')+'_'+today()+'.txt';
+document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+html('dlAlert','<div class="alert alert-success">Metin dosyasi indirildi!</div>');
+}
+
 </script>
+
 </body>
 </html>
