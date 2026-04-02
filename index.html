@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Okul Yönetim Sistemi — Piri Reis</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ===== RESET & BASE ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--text2:#6e6e73;--text3:#86868b;
+  --accent:#0071e3;--accent-hover:#0077ED;--red:#ff3b30;--green:#34c759;--orange:#ff9500;
+  --border:#d2d2d7;--border2:#e8e8ed;--radius:12px;--radius-lg:16px;
+  --shadow:0 2px 12px rgba(0,0,0,.08);--shadow-lg:0 4px 24px rgba(0,0,0,.12);
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+  --max-w:960px;
+}
+html{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15px;line-height:1.5}
+body{min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--accent);text-decoration:none}
+button,input,select,textarea{font-family:inherit;font-size:inherit}
+
+/* ===== LAYOUT ===== */
+.container{max-width:var(--max-w);margin:0 auto;padding:0 20px;width:100%}
+.page{display:none;padding:24px 0 100px;animation:fadeIn .3s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== HEADER ===== */
+.app-header{
+  background:rgba(255,255,255,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border2);position:sticky;top:0;z-index:100;padding:12px 0;
+}
+.app-header .container{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.app-header h1{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.header-nav{display:flex;gap:8px;align-items:center}
+.header-btn{
+  padding:6px 14px;border-radius:980px;border:none;background:var(--bg);
+  color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;transition:.2s;
+}
+.header-btn:hover{background:var(--border2);color:var(--text)}
+.header-btn.primary{background:var(--accent);color:#fff}
+.header-btn.primary:hover{background:var(--accent-hover)}
+.user-badge{font-size:12px;color:var(--text3);background:var(--bg);padding:4px 10px;border-radius:980px}
+
+/* ===== FOOTER ===== */
+.app-footer{
+  margin-top:auto;padding:20px 0;text-align:center;
+  border-top:1px solid var(--border2);background:var(--card);
+  font-size:12px;color:var(--text3);
+}
+.app-footer a{color:var(--text2)}
+
+/* ===== LOGIN ===== */
+.login-wrapper{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#f5f5f7 0%,#e8e8ed 100%);
+}
+.login-card{
+  background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);
+  padding:48px 40px;width:100%;max-width:380px;text-align:center;
+}
+.login-card .logo{font-size:40px;margin-bottom:8px}
+.login-card h2{font-size:22px;font-weight:600;margin-bottom:4px;letter-spacing:-.02em}
+.login-card p{font-size:13px;color:var(--text2);margin-bottom:28px}
+
+/* ===== FORMS ===== */
+.form-group{margin-bottom:16px;text-align:left}
+.form-group label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px}
+.form-input{
+  width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:15px;background:var(--bg);transition:.2s;outline:none;
+}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,.15)}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' fill='none' stroke='%236e6e73' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+textarea.form-input{resize:vertical;min-height:80px}
+
+/* ===== BUTTONS ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 20px;border-radius:980px;border:none;font-size:15px;font-weight:500;
+  cursor:pointer;transition:.2s;text-align:center;
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border2)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#e8342a}
+.btn-success{background:var(--green);color:#fff}
+.btn-sm{padding:6px 14px;font-size:13px}
+.btn-block{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ===== CARDS ===== */
+.card{background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow);padding:24px;margin-bottom:16px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:17px;font-weight:600}
+
+/* ===== DASHBOARD GRID ===== */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:24px}
+.dash-card{
+  background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow);
+  padding:28px 24px;cursor:pointer;transition:.2s;border:2px solid transparent;text-align:center;
+}
+.dash-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--accent)}
+.dash-card .icon{font-size:36px;margin-bottom:12px}
+.dash-card h3{font-size:17px;font-weight:600;margin-bottom:6px}
+.dash-card p{font-size:13px;color:var(--text2)}
+
+/* ===== PAGE HEADER ===== */
+.page-header{margin-bottom:24px}
+.page-header h2{font-size:24px;font-weight:600;letter-spacing:-.02em}
+.page-header p{font-size:14px;color:var(--text2);margin-top:4px}
+.sub-nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.sub-nav .btn{font-size:13px}
+
+/* ===== TABLES ===== */
+.table-wrap{overflow-x:auto;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:10px 12px;background:var(--bg);color:var(--text2);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border2)}
+td{padding:10px 12px;border-bottom:1px solid var(--border2)}
+tr:hover td{background:rgba(0,113,227,.03)}
+
+/* ===== ATTENDANCE ===== */
+.student-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border2);transition:.15s;
+}
+.student-row:last-child{border:none}
+.student-row .name{font-weight:500;font-size:15px}
+.student-row .number{font-size:12px;color:var(--text3);margin-left:8px}
+.status-btns{display:flex;gap:6px}
+.status-btn{
+  padding:6px 12px;border-radius:980px;font-size:12px;font-weight:500;
+  border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;transition:.15s;
+}
+.status-btn:hover{border-color:var(--text3)}
+.status-btn.absent{border-color:var(--red);color:var(--red);background:rgba(255,59,48,.06)}
+.status-btn.late{border-color:var(--orange);color:var(--orange);background:rgba(255,149,0,.06)}
+.status-btn.present{border-color:var(--green);color:var(--green);background:rgba(52,199,89,.06)}
+
+/* ===== SCHEDULE GRID ===== */
+.schedule-grid{display:grid;grid-template-columns:80px repeat(5,1fr);gap:2px;font-size:12px;margin-top:16px}
+.schedule-cell{padding:8px 6px;background:var(--card);text-align:center;border-radius:6px;min-height:40px;display:flex;align-items:center;justify-content:center}
+.schedule-cell.header{background:var(--accent);color:#fff;font-weight:600;font-size:11px}
+.schedule-cell.period{background:var(--bg);font-weight:600;color:var(--text2)}
+.schedule-cell.occupied{background:rgba(0,113,227,.08);color:var(--accent);font-weight:500}
+.schedule-cell.empty{background:var(--bg);color:var(--text3)}
+
+/* ===== ALERTS ===== */
+.alert{padding:12px 16px;border-radius:var(--radius);font-size:14px;margin-bottom:16px}
+.alert-success{background:rgba(52,199,89,.1);color:#1a7a32;border:1px solid rgba(52,199,89,.2)}
+.alert-error{background:rgba(255,59,48,.1);color:#c41e16;border:1px solid rgba(255,59,48,.2)}
+.alert-info{background:rgba(0,113,227,.08);color:#005bb5;border:1px solid rgba(0,113,227,.15)}
+
+/* ===== LOADING ===== */
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:var(--text2)}
+
+/* ===== MODAL ===== */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:32px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto}
+.modal h3{font-size:19px;font-weight:600;margin-bottom:16px}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:600px){
+  .dash-grid{grid-template-columns:1fr}
+  .schedule-grid{font-size:10px}
+  .schedule-grid{grid-template-columns:50px repeat(5,1fr)}
+  .login-card{padding:32px 24px}
+  .container{padding:0 16px}
+}
+
+/* ===== TAB BAR ===== */
+.tab-bar{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:var(--radius);margin-bottom:20px}
+.tab-item{
+  flex:1;padding:8px 12px;text-align:center;border-radius:8px;font-size:13px;
+  font-weight:500;color:var(--text2);cursor:pointer;transition:.2s;border:none;background:transparent;
+}
+.tab-item.active{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+
+/* ===== STAT CARDS ===== */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:16px;text-align:center;box-shadow:var(--shadow)}
+.stat-card .val{font-size:28px;font-weight:600;color:var(--accent)}
+.stat-card .label{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* ===== SEARCH ===== */
+.search-box{position:relative;margin-bottom:16px}
+.search-box input{padding-left:36px}
+.search-box::before{content:'⌕';position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="loginScreen" class="login-wrapper">
+  <div class="login-card">
+    <div class="logo">🏫</div>
+    <h2>Piri Reis</h2>
+    <p>Okul Yönetim Sistemi</p>
+    <div id="loginAlert"></div>
+    <div class="form-group">
+      <label>Kullanıcı Adı</label>
+      <input type="text" id="loginUser" class="form-input" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Şifre</label>
+      <input type="password" id="loginPass" class="form-input" placeholder="••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()" style="margin-top:8px">Giriş Yap</button>
+    <p style="margin-top:16px;font-size:11px;color:var(--text3)">Test: admin / admin123</p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appShell" style="display:none">
+  <header class="app-header">
+    <div class="container">
+      <h1 onclick="navigate('dashboard')" style="cursor:pointer">🏫 Piri Reis</h1>
+      <div class="header-nav">
+        <span class="user-badge" id="userBadge"></span>
+        <button class="header-btn" onclick="navigate('dashboard')">Ana Sayfa</button>
+        <button class="header-btn" onclick="doLogout()">Çıkış</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div id="pg-dashboard" class="page">
+      <div class="page-header">
+        <h2>Hoş Geldiniz 👋</h2>
+        <p id="welcomeName"></p>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card" onclick="navigate('students')">
+          <div class="icon">📚</div>
+          <h3>Öğrenci Takip</h3>
+          <p>Öğrenci ekleme, veri girişi ve raporlama</p>
+        </div>
+        <div class="dash-card" onclick="navigate('attendance')">
+          <div class="icon">✅</div>
+          <h3>Yoklama Sistemi</h3>
+          <p>Günlük yoklama, geç gelen ve raporlar</p>
+        </div>
+        <div class="dash-card" onclick="navigate('teachers')">
+          <div class="icon">👨‍🏫</div>
+          <h3>Öğretmen Yönetimi</h3>
+          <p>Program, vekil atama ve raporlama</p>
+        </div>
+      </div>
+      <div id="adminPanel" style="display:none;margin-top:24px">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">👑 Yönetici Paneli</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="navigate('admin-users')" style="margin-right:8px">Kullanıcı Yönetimi</button>
+          <button class="btn btn-secondary btn-sm" onclick="navigate('schedule-config')">Saat Ayarları</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ÖĞRENCİ TAKİP ===== -->
+    <div id="pg-students" class="page">
+      <div class="page-header">
+        <h2>📚 Öğrenci Takip Sistemi</h2>
+        <div class="sub-nav">
+          <button class="btn btn-secondary btn-sm" onclick="showStudentTab('list')">Öğrenci Listesi</button>
+          <button class="btn btn-secondary btn-sm" onclick="showStudentTab('add')">Öğrenci Ekle</button>
+          <button class="btn btn-secondary btn-sm" onclick="showStudentTab('data-entry')">Veri Girişi</button>
+          <button class="btn btn-secondary btn-sm" onclick="showStudentTab('report')">Rapor Al</button>
+        </div>
+      </div>
+      <div id="student-content"></div>
+    </div>
+
+    <!-- ===== YOKLAMA ===== -->
+    <div id="pg-attendance" class="page">
+      <div class="page-header">
+        <h2>✅ Yoklama Sistemi</h2>
+        <div class="sub-nav">
+          <button class="btn btn-secondary btn-sm" onclick="showAttendanceTab('take')">Yoklama Al</button>
+          <button class="btn btn-secondary btn-sm" onclick="showAttendanceTab('late')">Geç Gelen</button>
+          <button class="btn btn-secondary btn-sm" onclick="showAttendanceTab('report')">Rapor</button>
+        </div>
+      </div>
+      <div id="attendance-content"></div>
+    </div>
+
+    <!-- ===== ÖĞRETMEN YÖNETİMİ ===== -->
+    <div id="pg-teachers" class="page">
+      <div class="page-header">
+        <h2>👨‍🏫 Öğretmen Yönetimi</h2>
+        <div class="sub-nav" id="teacherNav"></div>
+      </div>
+      <div id="teacher-content"></div>
+    </div>
+
+    <!-- ===== ADMIN: KULLANICILAR ===== -->
+    <div id="pg-admin-users" class="page">
+      <div class="page-header">
+        <h2>👑 Kullanıcı Yönetimi</h2>
+        <p>Kullanıcı ekleme ve düzenleme</p>
+      </div>
+      <div id="admin-users-content"></div>
+    </div>
+
+    <!-- ===== ADMIN: SAAT AYARLARI ===== -->
+    <div id="pg-schedule-config" class="page">
+      <div class="page-header">
+        <h2>⏰ Ders Saati Ayarları</h2>
+      </div>
+      <div id="schedule-config-content"></div>
+    </div>
+
+  </main>
+
+  <footer class="app-footer">
+    Atıl ÇELİK — Eğitim Teknolojileri Koordinatörü · <a href="mailto:atilcelik@gmail.com">atilcelik@gmail.com</a>
+  </footer>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+// =====================================================
+// CONFIG
+// =====================================================
+const SUPABASE_URL = 'https://wrzsdecsembngeitfyxi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyenNkZWNzZW1ibmdlaXRmeXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTA1MzIsImV4cCI6MjA5MDY4NjUzMn0.WVcmxpmFQ5w53gIUPIg-vWo1Kl09dHyHC_lyOhghi3w';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+
+// =====================================================
+// AUTH
+// =====================================================
+function getSession() {
+  const raw = sessionStorage.getItem('session') || localStorage.getItem('session');
+  return raw ? JSON.parse(raw) : null;
+}
+function setSession(user) {
+  const data = JSON.stringify(user);
+  if (user.is_test_user) sessionStorage.setItem('session', data);
+  else localStorage.setItem('session', data);
+}
+function clearSession() {
+  sessionStorage.removeItem('session');
+  localStorage.removeItem('session');
+}
+
+async function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value.trim();
+  if (!username || !password) return showLoginAlert('Kullanıcı adı ve şifre gerekli', 'error');
+
+  const { data, error } = await sb.from('users')
+    .select('*')
+    .eq('username', username)
+    .eq('password_hash', password)
+    .single();
+
+  if (error || !data) return showLoginAlert('Hatalı kullanıcı adı veya şifre', 'error');
+
+  currentUser = data;
+  setSession(data);
+  showApp();
+}
+
+function doLogout() {
+  if (currentUser?.is_test_user) clearTestData();
+  clearSession();
+  currentUser = null;
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+async function clearTestData() {
+  const sid = currentUser.id + '_test';
+  await sb.from('student_data').delete().eq('session_id', sid);
+  await sb.from('attendance').delete().eq('session_id', sid);
+  await sb.from('substitutions').delete().eq('session_id', sid);
+}
+
+function showLoginAlert(msg, type) {
+  document.getElementById('loginAlert').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+// =====================================================
+// INIT
+// =====================================================
+window.addEventListener('DOMContentLoaded', () => {
+  const session = getSession();
+  if (session) { currentUser = session; showApp(); }
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+});
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'flex';
+  document.getElementById('appShell').style.flexDirection = 'column';
+  document.getElementById('appShell').style.minHeight = '100vh';
+
+  const badge = currentUser.role === 'admin' ? '👑 Admin' :
+    currentUser.role === 'idareci' ? '🏢 İdareci' :
+    currentUser.role === 'bolum_baskani' ? '📋 Bölüm Başkanı' :
+    currentUser.role === 'ogretmen' ? '👨‍🏫 Öğretmen' : '💼 Ofis';
+  document.getElementById('userBadge').textContent = `${badge} · ${currentUser.full_name}`;
+  document.getElementById('welcomeName').textContent = `${currentUser.full_name} — ${new Date().toLocaleDateString('tr-TR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}`;
+
+  if (currentUser.role === 'admin') document.getElementById('adminPanel').style.display = 'block';
+  else document.getElementById('adminPanel').style.display = 'none';
+
+  navigate('dashboard');
+}
+
+// =====================================================
+// NAVIGATION
+// =====================================================
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('pg-' + page);
+  if (el) { el.classList.add('active'); window.scrollTo(0, 0); }
+
+  if (page === 'students') showStudentTab('list');
+  if (page === 'attendance') showAttendanceTab('take');
+  if (page === 'teachers') initTeacherPage();
+  if (page === 'admin-users') loadAdminUsers();
+  if (page === 'schedule-config') loadScheduleConfig();
+}
+
+// =====================================================
+// HELPERS
+// =====================================================
+function $(id) { return document.getElementById(id); }
+function html(id, h) { document.getElementById(id).innerHTML = h; }
+function showModal(content) { $('modalContent').innerHTML = content; $('modalBg').classList.add('show'); }
+function closeModal() { $('modalBg').classList.remove('show'); }
+function sessionId() { return currentUser.id + (currentUser.is_test_user ? '_test' : ''); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function isAdmin() { return currentUser.role === 'admin'; }
+function canSubstitute() { return ['admin','idareci','bolum_baskani'].includes(currentUser.role); }
+
+// =====================================================
+// ÖĞRENCİ TAKİP
+// =====================================================
+async function showStudentTab(tab) {
+  const c = $('student-content');
+  if (tab === 'list') {
+    c.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Yükleniyor...</div>';
+    const { data: classes } = await sb.from('classes').select('*').order('id');
+    const { data: students } = await sb.from('students').select('*, classes(class_name)').order('full_name');
+    let h = `<div class="card"><div class="card-header"><span class="card-title">Tüm Öğrenciler (${students?.length||0})</span></div>`;
+    h += `<div class="search-box"><input type="text" class="form-input" placeholder="Öğrenci ara..." oninput="filterStudentTable(this.value)"></div>`;
+    h += `<div class="table-wrap"><table><thead><tr><th>No</th><th>Ad Soyad</th><th>Sınıf</th></tr></thead><tbody id="studentTableBody">`;
+    (students||[]).forEach(s => {
+      h += `<tr class="student-tr"><td>${s.student_number}</td><td>${s.full_name}</td><td>${s.classes?.class_name||'-'}</td></tr>`;
+    });
+    h += '</tbody></table></div></div>';
+    c.innerHTML = h;
+
+  } else if (tab === 'add') {
+    const { data: classes } = await sb.from('classes').select('*').order('id');
+    let opts = (classes||[]).map(cl => `<option value="${cl.id}">${cl.class_name}</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Öğrenci Ekle</div>
+        <div id="addStudentAlert"></div>
+        <div class="form-group"><label>Ad Soyad</label><input id="sName" class="form-input" placeholder="Öğrenci adı"></div>
+        <div class="form-group"><label>Okul Numarası</label><input id="sNumber" class="form-input" placeholder="Numara"></div>
+        <div class="form-group"><label>Sınıf</label><select id="sClass" class="form-input"><option value="">Seçin</option>${opts}</select></div>
+        <button class="btn btn-primary" onclick="addStudent()">Ekle</button>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Toplu Yükleme (CSV)</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">CSV formatı: ad_soyad,okul_no,sinif_id (her satır bir öğrenci)</p>
+        <textarea id="csvData" class="form-input" rows="5" placeholder="AHMET YILMAZ,201,1&#10;AYŞE KAYA,202,2"></textarea>
+        <button class="btn btn-secondary" onclick="bulkAddStudents()" style="margin-top:12px">Toplu Ekle</button>
+      </div>`;
+
+  } else if (tab === 'data-entry') {
+    const { data: teachers } = await sb.from('teachers').select('*').order('full_name');
+    const { data: students } = await sb.from('students').select('*').order('full_name');
+    let tOpts = (teachers||[]).map(t => `<option value="${t.id}" data-branch="${t.branch}">${t.full_name} (${t.branch})</option>`).join('');
+    let sOpts = (students||[]).map(s => `<option value="${s.id}">${s.full_name} (${s.student_number})</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Öğrenci Veri Girişi</div>
+        <div id="dataEntryAlert"></div>
+        <div class="form-group"><label>Tarih</label><input id="deDate" type="date" class="form-input" value="${today()}"></div>
+        <div class="form-group"><label>Öğretmen</label><select id="deTeacher" class="form-input" onchange="updateBranch()"><option value="">Seçin</option>${tOpts}</select></div>
+        <div class="form-group"><label>Branş</label><input id="deBranch" class="form-input" readonly></div>
+        <div class="form-group"><label>Öğrenci</label><select id="deStudent" class="form-input"><option value="">Seçin</option>${sOpts}</select></div>
+        <div class="form-group"><label>Veri Türü</label><select id="deType" class="form-input">
+          <option value="">Seçin</option>
+          <option>Akademik Başarı</option><option>Davranış</option><option>Sosyal Gelişim</option>
+          <option>Katılım</option><option>Proje/Ödev</option><option>Sınav Sonucu</option>
+          <option>Görüşme Notu</option><option>Diğer</option>
+        </select></div>
+        <div class="form-group"><label>Açıklama</label><textarea id="deDesc" class="form-input" placeholder="Detaylı açıklama yazın..."></textarea></div>
+        <button class="btn btn-primary" onclick="saveDataEntry()">Kaydet</button>
+      </div>`;
+
+  } else if (tab === 'report') {
+    const { data: students } = await sb.from('students').select('*, classes(class_name)').order('full_name');
+    let sOpts = (students||[]).map(s => `<option value="${s.id}">${s.full_name} (${s.student_number}) — ${s.classes?.class_name||''}</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Öğrenci Raporu</div>
+        <div class="form-group"><label>Öğrenci</label><select id="repStudent" class="form-input"><option value="">Seçin</option>${sOpts}</select></div>
+        <div style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1"><label>Başlangıç</label><input id="repFrom" type="date" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>Bitiş</label><input id="repTo" type="date" class="form-input" value="${today()}"></div>
+        </div>
+        <button class="btn btn-primary" onclick="generateStudentReport()">Rapor Oluştur</button>
+      </div>
+      <div id="reportResult"></div>`;
+  }
+}
+
+function filterStudentTable(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.student-tr').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function updateBranch() {
+  const sel = $('deTeacher');
+  const opt = sel.options[sel.selectedIndex];
+  $('deBranch').value = opt?.dataset?.branch || '';
+}
+
+async function addStudent() {
+  const name = $('sName').value.trim();
+  const num = $('sNumber').value.trim();
+  const classId = $('sClass').value;
+  if (!name || !num) return html('addStudentAlert', '<div class="alert alert-error">Ad ve numara gerekli</div>');
+  const { error } = await sb.from('students').insert({ full_name: name, student_number: num, class_id: classId || null });
+  if (error) return html('addStudentAlert', `<div class="alert alert-error">${error.message}</div>`);
+  html('addStudentAlert', '<div class="alert alert-success">Öğrenci eklendi!</div>');
+  $('sName').value = ''; $('sNumber').value = '';
+}
+
+async function bulkAddStudents() {
+  const lines = $('csvData').value.trim().split('\n').filter(l => l.trim());
+  if (!lines.length) return alert('CSV verisi girin');
+  const rows = lines.map(l => { const p = l.split(','); return { full_name: p[0]?.trim(), student_number: p[1]?.trim(), class_id: parseInt(p[2]) || null }; });
+  const { error } = await sb.from('students').insert(rows);
+  if (error) return alert('Hata: ' + error.message);
+  alert(`${rows.length} öğrenci eklendi!`);
+  showStudentTab('list');
+}
+
+async function saveDataEntry() {
+  const teacherId = $('deTeacher').value;
+  const studentId = $('deStudent').value;
+  const dataType = $('deType').value;
+  const desc = $('deDesc').value.trim();
+  const date = $('deDate').value;
+  const branch = $('deBranch').value;
+  if (!studentId || !dataType || !desc) return html('dataEntryAlert', '<div class="alert alert-error">Öğrenci, veri türü ve açıklama gerekli</div>');
+  const { error } = await sb.from('student_data').insert({
+    student_id: parseInt(studentId), teacher_id: teacherId ? parseInt(teacherId) : null,
+    teacher_branch: branch, data_type: dataType, description: desc,
+    entry_date: date, created_by: currentUser.id, session_id: currentUser.is_test_user ? sessionId() : null
+  });
+  if (error) return html('dataEntryAlert', `<div class="alert alert-error">${error.message}</div>`);
+  html('dataEntryAlert', '<div class="alert alert-success">Veri kaydedildi!</div>');
+  $('deDesc').value = '';
+}
+
+async function generateStudentReport() {
+  const sid = $('repStudent').value;
+  const from = $('repFrom').value;
+  const to = $('repTo').value;
+  if (!sid) return alert('Öğrenci seçin');
+  const rc = $('reportResult');
+  rc.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Rapor hazırlanıyor...</div>';
+
+  const { data: student } = await sb.from('students').select('*, classes(class_name)').eq('id', sid).single();
+  let query = sb.from('student_data').select('*, teachers(full_name)').eq('student_id', sid).order('entry_date', { ascending: false });
+  if (from) query = query.gte('entry_date', from);
+  if (to) query = query.lte('entry_date', to);
+  const { data: entries } = await query;
+
+  const { data: attData } = await sb.from('attendance').select('*').eq('student_id', sid);
+  const totalDays = attData?.length || 0;
+  const absent = attData?.filter(a => a.status === 'absent').length || 0;
+  const late = attData?.filter(a => a.status === 'late').length || 0;
+  const present = totalDays - absent - late;
+
+  let h = `<div class="card" style="margin-top:16px">
+    <div class="card-title">${student.full_name} — ${student.classes?.class_name||''}</div>
+    <div class="stats-row" style="margin-top:16px">
+      <div class="stat-card"><div class="val">${entries?.length||0}</div><div class="label">Kayıt</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--green)">${present}</div><div class="label">Geldi</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--red)">${absent}</div><div class="label">Gelmedi</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--orange)">${late}</div><div class="label">Geç</div></div>
+    </div>`;
+
+  if (entries?.length) {
+    h += '<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Öğretmen</th><th>Açıklama</th></tr></thead><tbody>';
+    entries.forEach(e => {
+      h += `<tr><td>${e.entry_date}</td><td>${e.data_type}</td><td>${e.teachers?.full_name||'-'}</td><td style="max-width:300px">${e.description}</td></tr>`;
+    });
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+  rc.innerHTML = h;
+}
+
+// =====================================================
+// YOKLAMA
+// =====================================================
+let attendanceData = {};
+
+async function showAttendanceTab(tab) {
+  const c = $('attendance-content');
+
+  if (tab === 'take') {
+    const { data: classes } = await sb.from('classes').select('*').order('id');
+    let opts = (classes||[]).map(cl => `<option value="${cl.id}">${cl.class_name}</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Yoklama Al</div>
+        <div class="form-group"><label>Sınıf</label><select id="attClass" class="form-input" onchange="loadAttendanceStudents()"><option value="">Sınıf seçin</option>${opts}</select></div>
+        <div class="form-group"><label>Tarih</label><input id="attDate" type="date" class="form-input" value="${today()}"></div>
+        <div id="attStudentList"></div>
+        <div id="attAlert" style="margin-top:12px"></div>
+      </div>`;
+
+  } else if (tab === 'late') {
+    const { data: classes } = await sb.from('classes').select('*').order('id');
+    let opts = (classes||[]).map(cl => `<option value="${cl.id}">${cl.class_name}</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Geç Gelen Öğrenci</div>
+        <div class="form-group"><label>Sınıf</label><select id="lateClass" class="form-input" onchange="loadLateStudents()"><option value="">Seçin</option>${opts}</select></div>
+        <div class="form-group"><label>Tarih</label><input id="lateDate" type="date" class="form-input" value="${today()}"></div>
+        <div id="lateStudentList"></div>
+      </div>`;
+
+  } else if (tab === 'report') {
+    const { data: students } = await sb.from('students').select('*, classes(class_name)').order('full_name');
+    let sOpts = (students||[]).map(s => `<option value="${s.id}">${s.full_name} — ${s.classes?.class_name||''}</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Yoklama Raporu</div>
+        <div class="form-group"><label>Öğrenci</label><select id="attRepStudent" class="form-input"><option value="">Tüm öğrenciler</option>${sOpts}</select></div>
+        <div style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1"><label>Başlangıç</label><input id="attRepFrom" type="date" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>Bitiş</label><input id="attRepTo" type="date" class="form-input" value="${today()}"></div>
+        </div>
+        <button class="btn btn-primary" onclick="generateAttendanceReport()">Rapor Oluştur</button>
+      </div>
+      <div id="attReportResult"></div>`;
+  }
+}
+
+async function loadAttendanceStudents() {
+  const classId = $('attClass').value;
+  if (!classId) return;
+  const { data: students } = await sb.from('students').select('*').eq('class_id', classId).order('full_name');
+  attendanceData = {};
+  (students || []).forEach(s => attendanceData[s.id] = 'present');
+
+  let h = '<div style="margin-top:16px">';
+  (students || []).forEach(s => {
+    h += `<div class="student-row" id="att-row-${s.id}">
+      <div><span class="name">${s.full_name}</span><span class="number">${s.student_number}</span></div>
+      <div class="status-btns">
+        <button class="status-btn present" id="att-p-${s.id}" onclick="setAttStatus(${s.id},'present')">Geldi ✓</button>
+        <button class="status-btn" id="att-a-${s.id}" onclick="setAttStatus(${s.id},'absent')">Gelmedi ✗</button>
+      </div>
+    </div>`;
+  });
+  h += `<button class="btn btn-primary btn-block" onclick="saveAttendance()" style="margin-top:16px">Yoklamayı Kaydet</button></div>`;
+  $('attStudentList').innerHTML = h;
+}
+
+function setAttStatus(studentId, status) {
+  attendanceData[studentId] = status;
+  const pBtn = $('att-p-' + studentId);
+  const aBtn = $('att-a-' + studentId);
+  pBtn.className = 'status-btn' + (status === 'present' ? ' present' : '');
+  aBtn.className = 'status-btn' + (status === 'absent' ? ' absent' : '');
+}
+
+async function saveAttendance() {
+  const classId = $('attClass').value;
+  const date = $('attDate').value;
+  const rows = Object.entries(attendanceData).map(([sid, status]) => ({
+    student_id: parseInt(sid), class_id: parseInt(classId), attendance_date: date, status,
+    created_by: currentUser.id, session_id: currentUser.is_test_user ? sessionId() : null
+  }));
+
+  // Remove existing attendance for this class/date
+  await sb.from('attendance').delete().eq('class_id', classId).eq('attendance_date', date);
+  const { error } = await sb.from('attendance').insert(rows);
+  if (error) return html('attAlert', `<div class="alert alert-error">${error.message}</div>`);
+  html('attAlert', '<div class="alert alert-success">Yoklama kaydedildi!</div>');
+}
+
+async function loadLateStudents() {
+  const classId = $('lateClass').value;
+  const date = $('lateDate').value;
+  if (!classId) return;
+
+  const { data: absent } = await sb.from('attendance').select('*, students(full_name, student_number)')
+    .eq('class_id', classId).eq('attendance_date', date).eq('status', 'absent');
+
+  if (!absent?.length) { $('lateStudentList').innerHTML = '<div class="alert alert-info" style="margin-top:12px">Bu tarihte gelmedi kaydı yok</div>'; return; }
+
+  let h = '<div style="margin-top:16px">';
+  absent.forEach(a => {
+    h += `<div class="student-row">
+      <div><span class="name">${a.students.full_name}</span><span class="number">${a.students.student_number}</span></div>
+      <div class="status-btns">
+        <button class="status-btn" onclick="markLate(${a.id}, this)">Geç Geldi 🕐</button>
+      </div>
+    </div>`;
+  });
+  h += '</div>';
+  $('lateStudentList').innerHTML = h;
+}
+
+async function markLate(attId, btn) {
+  const time = prompt('Geliş saatini girin (ör: 09:30)');
+  if (!time) return;
+  await sb.from('attendance').update({ status: 'late', late_time: time }).eq('id', attId);
+  btn.className = 'status-btn late';
+  btn.textContent = 'Geç (' + time + ') ✓';
+  btn.disabled = true;
+}
+
+async function generateAttendanceReport() {
+  const sid = $('attRepStudent').value;
+  const from = $('attRepFrom').value;
+  const to = $('attRepTo').value;
+  const rc = $('attReportResult');
+  rc.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Yükleniyor...</div>';
+
+  let query = sb.from('attendance').select('*, students(full_name, student_number), classes(class_name)');
+  if (sid) query = query.eq('student_id', sid);
+  if (from) query = query.gte('attendance_date', from);
+  if (to) query = query.lte('attendance_date', to);
+  const { data } = await query.order('attendance_date', { ascending: false });
+
+  if (!data?.length) { rc.innerHTML = '<div class="alert alert-info" style="margin-top:16px">Kayıt bulunamadı</div>'; return; }
+
+  // Group by student
+  const grouped = {};
+  data.forEach(r => {
+    const key = r.student_id;
+    if (!grouped[key]) grouped[key] = { name: r.students.full_name, num: r.students.student_number, cls: r.classes?.class_name, records: [] };
+    grouped[key].records.push(r);
+  });
+
+  let h = '<div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Yoklama Raporu</div><div class="table-wrap"><table><thead><tr><th>Öğrenci</th><th>Sınıf</th><th>Geldi</th><th>Gelmedi</th><th>Geç</th><th>Devamsızlık %</th></tr></thead><tbody>';
+  Object.values(grouped).forEach(g => {
+    const total = g.records.length;
+    const absent = g.records.filter(r => r.status === 'absent').length;
+    const late = g.records.filter(r => r.status === 'late').length;
+    const present = total - absent - late;
+    const pct = total ? Math.round((absent / total) * 100) : 0;
+    h += `<tr><td>${g.name} (${g.num})</td><td>${g.cls||'-'}</td><td style="color:var(--green)">${present}</td><td style="color:var(--red)">${absent}</td><td style="color:var(--orange)">${late}</td><td>${pct}%</td></tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  rc.innerHTML = h;
+}
+
+// =====================================================
+// ÖĞRETMEN YÖNETİMİ
+// =====================================================
+function initTeacherPage() {
+  const nav = $('teacherNav');
+  let btns = '';
+  if (isAdmin()) {
+    btns += '<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'list\')">Öğretmenler</button>';
+    btns += '<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'add\')">Öğretmen Ekle</button>';
+    btns += '<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'schedule\')">Program</button>';
+  }
+  if (canSubstitute()) {
+    btns += '<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'substitute\')">Vekil Atama</button>';
+  }
+  btns += '<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'report\')">Rapor</button>';
+  nav.innerHTML = btns;
+  showTeacherTab(canSubstitute() ? 'substitute' : 'list');
+}
+
+async function showTeacherTab(tab) {
+  const c = $('teacher-content');
+
+  if (tab === 'list') {
+    const { data: teachers } = await sb.from('teachers').select('*').order('full_name');
+    let h = '<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Listesi</div><div class="table-wrap"><table><thead><tr><th>Ad Soyad</th><th>Branş</th><th>Email</th></tr></thead><tbody>';
+    (teachers||[]).forEach(t => {
+      h += `<tr><td>${t.full_name}</td><td>${t.branch}</td><td>${t.email||'-'}</td></tr>`;
+    });
+    h += '</tbody></table></div></div>';
+    c.innerHTML = h;
+
+  } else if (tab === 'add') {
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Öğretmen Ekle</div>
+        <div id="addTeacherAlert"></div>
+        <div class="form-group"><label>Ad Soyad</label><input id="tName" class="form-input"></div>
+        <div class="form-group"><label>Branş</label><input id="tBranch" class="form-input"></div>
+        <div class="form-group"><label>Email</label><input id="tEmail" class="form-input" type="email"></div>
+        <button class="btn btn-primary" onclick="addTeacher()">Ekle</button>
+      </div>`;
+
+  } else if (tab === 'schedule') {
+    c.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Program yükleniyor...</div>';
+    const { data: teachers } = await sb.from('teachers').select('*').order('full_name');
+    let tOpts = (teachers||[]).map(t => `<option value="${t.id}">${t.full_name} (${t.branch})</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Haftalık Ders Programı</div>
+        <div class="form-group"><label>Öğretmen Seç</label><select id="schedTeacher" class="form-input" onchange="loadTeacherSchedule()"><option value="">Seçin</option>${tOpts}</select></div>
+        <div id="scheduleGrid"></div>
+      </div>`;
+
+  } else if (tab === 'substitute') {
+    const { data: teachers } = await sb.from('teachers').select('*').order('full_name');
+    let tOpts = (teachers||[]).map(t => `<option value="${t.id}">${t.full_name} (${t.branch})</option>`).join('');
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px">Vekil Öğretmen Atama</div>
+        <div id="subAlert"></div>
+        <div class="form-group"><label>Gelmeyen Öğretmen</label><select id="subAbsent" class="form-input" onchange="loadAbsentSchedule()"><option value="">Seçin</option>${tOpts}</select></div>
+        <div class="form-group"><label>Tarih</label><input id="subDate" type="date" class="form-input" value="${today()}" onchange="loadAbsentSchedule()"></div>
+        <div id="subSchedule"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title" style="margin-bottom:16px">Geçmiş Vekil Atamalar</div>
+        <div id="subHistory"></div>
+      </div>`;
+    loadSubHistory();
+
+  } else if (tab === 'report') {
+    c.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Rapor hazırlanıyor...</div>';
+    const { data: subs } = await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('substitution_date', { ascending: false });
+
+    // Count absences per teacher
+    const absMap = {};
+    const subMap = {};
+    (subs||[]).forEach(s => {
+      absMap[s.absent?.full_name] = (absMap[s.absent?.full_name]||0) + 1;
+      subMap[s.sub?.full_name] = (subMap[s.sub?.full_name]||0) + 1;
+    });
+
+    let h = '<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Devamsızlık ve Vekil Raporu</div>';
+    h += '<div class="stats-row"><div class="stat-card"><div class="val">' + (subs?.length||0) + '</div><div class="label">Toplam Vekil Atama</div></div></div>';
+    h += '<div class="table-wrap"><table><thead><tr><th>Öğretmen</th><th>Gelmediği Ders</th><th>Vekil Olduğu Ders</th></tr></thead><tbody>';
+    const { data: teachers } = await sb.from('teachers').select('*').order('full_name');
+    (teachers||[]).forEach(t => {
+      h += `<tr><td>${t.full_name}</td><td style="color:var(--red)">${absMap[t.full_name]||0}</td><td style="color:var(--green)">${subMap[t.full_name]||0}</td></tr>`;
+    });
+    h += '</tbody></table></div></div>';
+    c.innerHTML = h;
+  }
+}
+
+async function addTeacher() {
+  const name = $('tName').value.trim();
+  const branch = $('tBranch').value.trim();
+  const email = $('tEmail').value.trim();
+  if (!name || !branch) return html('addTeacherAlert', '<div class="alert alert-error">Ad ve branş gerekli</div>');
+  const { error } = await sb.from('teachers').insert({ full_name: name, branch, email: email || null });
+  if (error) return html('addTeacherAlert', `<div class="alert alert-error">${error.message}</div>`);
+  html('addTeacherAlert', '<div class="alert alert-success">Öğretmen eklendi!</div>');
+  $('tName').value = ''; $('tBranch').value = ''; $('tEmail').value = '';
+}
+
+async function loadTeacherSchedule() {
+  const tid = $('schedTeacher').value;
+  if (!tid) return;
+  const { data: schedule } = await sb.from('teacher_schedule').select('*').eq('teacher_id', tid);
+  const { data: config } = await sb.from('schedule_config').select('*').order('period_number');
+  const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
+  const periods = config || [];
+
+  let h = '<div class="schedule-grid">';
+  h += '<div class="schedule-cell header">Saat</div>';
+  days.forEach(d => h += `<div class="schedule-cell header">${d.substring(0,3)}</div>`);
+
+  periods.forEach(p => {
+    h += `<div class="schedule-cell period">${p.period_number}. Ders<br><span style="font-size:10px">${p.start_time?.substring(0,5)}</span></div>`;
+    days.forEach(d => {
+      const lesson = (schedule||[]).find(s => s.day_of_week === d && s.period_number === p.period_number);
+      if (lesson) h += `<div class="schedule-cell occupied">${lesson.class_info}</div>`;
+      else h += `<div class="schedule-cell empty">—</div>`;
+    });
+  });
+  h += '</div>';
+  $('scheduleGrid').innerHTML = h;
+}
+
+async function loadAbsentSchedule() {
+  const tid = $('subAbsent').value;
+  const date = $('subDate').value;
+  if (!tid || !date) return;
+
+  const dayName = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'][new Date(date).getDay()];
+  const { data: schedule } = await sb.from('teacher_schedule').select('*').eq('teacher_id', tid).eq('day_of_week', dayName);
+
+  if (!schedule?.length) { $('subSchedule').innerHTML = '<div class="alert alert-info" style="margin-top:12px">Bu günde dersi yok</div>'; return; }
+
+  const { data: allSchedules } = await sb.from('teacher_schedule').select('*, teachers(id, full_name, branch)').eq('day_of_week', dayName);
+  const { data: config } = await sb.from('schedule_config').select('*').order('period_number');
+
+  let h = '<div style="margin-top:16px">';
+  for (const lesson of schedule) {
+    const periodInfo = config?.find(c => c.period_number === lesson.period_number);
+    const busyTeacherIds = (allSchedules||[]).filter(s => s.period_number === lesson.period_number).map(s => s.teacher_id);
+    const { data: allTeachers } = await sb.from('teachers').select('*').order('full_name');
+    const available = (allTeachers||[]).filter(t => t.id !== parseInt(tid) && !busyTeacherIds.includes(t.id));
+
+    let avOpts = available.map(t => `<option value="${t.id}">${t.full_name} (${t.branch})</option>`).join('');
+
+    h += `<div class="student-row" style="flex-wrap:wrap;gap:8px">
+      <div>
+        <span class="name">${lesson.period_number}. Ders</span>
+        <span class="number">${periodInfo?.start_time?.substring(0,5)||''} — Sınıf: ${lesson.class_info}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="sub-sel-${lesson.period_number}" class="form-input" style="width:auto;padding:6px 10px;font-size:13px">
+          <option value="">Vekil seç</option>${avOpts}
+        </select>
+        <button class="btn btn-sm btn-primary" onclick="assignSubstitute(${tid},'${date}',${lesson.period_number},'${lesson.class_info}')">Ata</button>
+      </div>
+    </div>`;
+  }
+  h += '</div>';
+  $('subSchedule').innerHTML = h;
+}
+
+async function assignSubstitute(absentId, date, period, classInfo) {
+  const subId = $('sub-sel-' + period).value;
+  if (!subId) return alert('Vekil öğretmen seçin');
+  const { error } = await sb.from('substitutions').insert({
+    absent_teacher_id: absentId, substitute_teacher_id: parseInt(subId),
+    substitution_date: date, period_number: period, class_info: classInfo,
+    assigned_by: currentUser.id, session_id: currentUser.is_test_user ? sessionId() : null
+  });
+  if (error) return html('subAlert', `<div class="alert alert-error">${error.message}</div>`);
+  html('subAlert', '<div class="alert alert-success">Vekil atandı!</div>');
+  loadSubHistory();
+}
+
+async function loadSubHistory() {
+  const { data } = await sb.from('substitutions')
+    .select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)')
+    .order('created_at', { ascending: false }).limit(20);
+
+  if (!data?.length) { $('subHistory').innerHTML = '<p style="color:var(--text3);font-size:13px">Henüz atama yok</p>'; return; }
+  let h = '<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Ders</th><th>Gelmeyen</th><th>Vekil</th><th>Sınıf</th></tr></thead><tbody>';
+  data.forEach(s => {
+    h += `<tr><td>${s.substitution_date}</td><td>${s.period_number}. Ders</td><td>${s.absent?.full_name||'-'}</td><td>${s.sub?.full_name||'-'}</td><td>${s.class_info||'-'}</td></tr>`;
+  });
+  h += '</tbody></table></div>';
+  $('subHistory').innerHTML = h;
+}
+
+// =====================================================
+// ADMIN: KULLANICILAR
+// =====================================================
+async function loadAdminUsers() {
+  const c = $('admin-users-content');
+  c.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Yükleniyor...</div>';
+  const { data: users } = await sb.from('users').select('*').order('id');
+
+  let h = `<div class="card">
+    <div class="card-header"><span class="card-title">Kullanıcılar</span><button class="btn btn-sm btn-primary" onclick="showAddUserModal()">+ Ekle</button></div>
+    <div class="table-wrap"><table><thead><tr><th>Kullanıcı Adı</th><th>Ad Soyad</th><th>Rol</th><th>Test</th></tr></thead><tbody>`;
+  (users||[]).forEach(u => {
+    const roleName = {admin:'Admin',ogretmen:'Öğretmen',idareci:'İdareci',bolum_baskani:'Bölüm Başkanı',ofis_calisani:'Ofis'}[u.role]||u.role;
+    h += `<tr><td>${u.username}</td><td>${u.full_name}</td><td>${roleName}</td><td>${u.is_test_user?'✓':''}</td></tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  c.innerHTML = h;
+}
+
+function showAddUserModal() {
+  showModal(`
+    <h3>Yeni Kullanıcı Ekle</h3>
+    <div id="addUserAlert"></div>
+    <div class="form-group"><label>Kullanıcı Adı</label><input id="nuUser" class="form-input"></div>
+    <div class="form-group"><label>Şifre</label><input id="nuPass" class="form-input" type="password"></div>
+    <div class="form-group"><label>Ad Soyad</label><input id="nuName" class="form-input"></div>
+    <div class="form-group"><label>Rol</label><select id="nuRole" class="form-input">
+      <option value="ogretmen">Öğretmen</option><option value="idareci">İdareci</option>
+      <option value="bolum_baskani">Bölüm Başkanı</option><option value="ofis_calisani">Ofis Çalışanı</option>
+      <option value="admin">Admin</option>
+    </select></div>
+    <div class="form-group"><label>Email</label><input id="nuEmail" class="form-input" type="email"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" onclick="addUser()">Ekle</button>
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+    </div>`);
+}
+
+async function addUser() {
+  const username = $('nuUser').value.trim();
+  const password = $('nuPass').value.trim();
+  const fullName = $('nuName').value.trim();
+  const role = $('nuRole').value;
+  const email = $('nuEmail').value.trim();
+  if (!username || !password || !fullName) return html('addUserAlert', '<div class="alert alert-error">Tüm alanlar gerekli</div>');
+  const { error } = await sb.from('users').insert({ username, password_hash: password, full_name: fullName, role, email: email || null });
+  if (error) return html('addUserAlert', `<div class="alert alert-error">${error.message}</div>`);
+  closeModal();
+  loadAdminUsers();
+}
+
+// =====================================================
+// ADMIN: SAAT AYARLARI
+// =====================================================
+async function loadScheduleConfig() {
+  const c = $('schedule-config-content');
+  const { data: config } = await sb.from('schedule_config').select('*').order('period_number');
+
+  let h = '<div class="card"><div class="card-header"><span class="card-title">Ders Saatleri</span>';
+  if (isAdmin()) h += '<button class="btn btn-sm btn-primary" onclick="addPeriodModal()">+ Ders Saati Ekle</button>';
+  h += '</div><div class="table-wrap"><table><thead><tr><th>Ders</th><th>Başlangıç</th><th>Bitiş</th>';
+  if (isAdmin()) h += '<th>İşlem</th>';
+  h += '</tr></thead><tbody>';
+  (config||[]).forEach(c => {
+    h += `<tr><td>${c.period_number}. Ders</td><td>${c.start_time?.substring(0,5)}</td><td>${c.end_time?.substring(0,5)}</td>`;
+    if (isAdmin()) h += `<td><button class="btn btn-sm btn-danger" onclick="deletePeriod(${c.id})">Sil</button></td>`;
+    h += '</tr>';
+  });
+  h += '</tbody></table></div></div>';
+  c.innerHTML = h;
+}
+
+function addPeriodModal() {
+  showModal(`
+    <h3>Ders Saati Ekle</h3>
+    <div class="form-group"><label>Ders Numarası</label><input id="pNum" type="number" class="form-input"></div>
+    <div class="form-group"><label>Başlangıç</label><input id="pStart" type="time" class="form-input"></div>
+    <div class="form-group"><label>Bitiş</label><input id="pEnd" type="time" class="form-input"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" onclick="addPeriod()">Ekle</button>
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+    </div>`);
+}
+
+async function addPeriod() {
+  const num = parseInt($('pNum').value);
+  const start = $('pStart').value;
+  const end = $('pEnd').value;
+  if (!num || !start || !end) return alert('Tüm alanları doldurun');
+  await sb.from('schedule_config').insert({ period_number: num, start_time: start, end_time: end });
+  closeModal();
+  loadScheduleConfig();
+}
+
+async function deletePeriod(id) {
+  if (!confirm('Silmek istediğinize emin misiniz?')) return;
+  await sb.from('schedule_config').delete().eq('id', id);
+  loadScheduleConfig();
+}
+</script>
+</body>
+</html>
