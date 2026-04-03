@@ -5,149 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Özel Arkas Piri Reis Anadolu Lisesi — Yönetim Sistemi</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-// ===== ÖĞRETMEN GÖRÜŞLERİ =====
-async function writeOpinionModal(studentId,studentName,teacherId){
-showModal('<h3>Görüş Yaz — '+studentName+'</h3><div id="opModalAlert"></div><div class="form-group"><label>Görüşünüz (Türkçe veya Fransızca)</label><textarea id="opText" class="form-input" rows="5" placeholder="Öğrenci hakkındaki değerlendirmenizi yazın..."></textarea></div><div class="form-group"><label>Dönem</label><select id="opTerm" class="form-input"><option value="2024-2025 Güz">2024-2025 Güz</option><option value="2024-2025 Bahar" selected>2024-2025 Bahar</option><option value="2025-2026 Güz">2025-2026 Güz</option></select></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveOpinion('+studentId+','+teacherId+')">Kaydet ve Çevir</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>');
-}
-async function saveOpinion(studentId,teacherId){
-const text=$('opText').value.trim();
-const term=$('opTerm').value;
-if(!text)return html('opModalAlert','<div class="alert alert-error">Görüş metni gerekli</div>');
-html('opModalAlert','<div class="loading-overlay"><div class="spinner"></div> Çevriliyor...</div>');
-try{
-const isTurkish=/[ğüşıöçĞÜŞİÖÇ]/.test(text)||/^[a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s.,;:!?()-]+$/.test(text);
-const prompt=isTurkish?
-'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz, başka bir şey ekleme:
-
-'+text:
-'Translate the following French teacher opinion to Turkish. Only write the translation, nothing else:
-
-'+text;
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-const translated=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
-const opTr=isTurkish?text:translated;
-const opFr=isTurkish?translated:text;
-const{error}=await sb.from('teacher_opinions').insert({
-student_id:studentId,teacher_id:teacherId,
-opinion_tr:opTr,opinion_fr:opFr,term:term
-});
-if(error)return html('opModalAlert','<div class="alert alert-error">'+error.message+'</div>');
-html('opModalAlert','<div class="alert alert-success">Görüş kaydedildi!<br><strong>TR:</strong> '+opTr.substring(0,100)+'...<br><strong>FR:</strong> '+opFr.substring(0,100)+'...</div>');
-setTimeout(()=>closeModal(),3000);
-}catch(e){html('opModalAlert','<div class="alert alert-error">Çeviri hatası: '+e.message+'</div>')}
-}
-async function viewPastOpinions(studentId,studentName){
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId).order('created_at',{ascending:false});
-let h='<h3>📜 '+studentName+' — Geçmiş Görüşler</h3>';
-if(!ops?.length){h+='<p style="color:var(--text3);margin-top:12px">Henüz görüş yazılmamış.</p>'}
-else{(ops).forEach(o=>{
-h+='<div style="border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-top:12px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:500;font-size:13px">'+(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+')</span><span style="font-size:11px;color:var(--text3)">'+( o.term||'')+' — '+new Date(o.created_at).toLocaleDateString('tr-TR')+'</span></div>';
-h+='<div style="font-size:13px;margin-bottom:6px"><strong>TR:</strong> '+(o.opinion_tr||'-')+'</div>';
-h+='<div style="font-size:13px;color:var(--text2)"><strong>FR:</strong> '+(o.opinion_fr||'-')+'</div></div>';
-})}
-h+='<div style="margin-top:16px"><button class="btn btn-secondary" onclick="closeModal()">Kapat</button></div>';
-showModal(h);
-}
-async function viewClassOpinions(){
-const cid=$('opClassSel').value;
-if(!cid)return alert('Sınıf seçin');
-const rc=$('opinionResult');
-rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yükleniyor...</div>';
-const{data:students}=await sb.from('students').select('*, classes(class_name)').eq('class_id',cid).order('full_name');
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',(students||[]).map(s=>s.id)).order('created_at',{ascending:false});
-let h='';
-(students||[]).forEach(st=>{
-const stOps=(ops||[]).filter(o=>o.student_id===st.id);
-h+='<div class="card" style="margin-bottom:12px"><div class="card-title">'+st.full_name+' ('+st.student_number+') — '+(st.classes?.class_name||'')+'</div>';
-if(!stOps.length){h+='<p style="color:var(--text3);font-size:13px;margin-top:8px">Görüş yok</p>'}
-else{stOps.forEach(o=>{
-h+='<div style="border-left:3px solid var(--accent);padding:8px 12px;margin-top:8px;font-size:13px"><div style="font-weight:500;margin-bottom:4px">'+(o.teachers?.full_name||'-')+' — '+(o.teachers?.branch||'-')+' <span style="color:var(--text3);font-weight:400">('+( o.term||'')+')</span></div>';
-h+='<div><strong>TR:</strong> '+(o.opinion_tr||'-')+'</div>';
-h+='<div style="color:var(--text2)"><strong>FR:</strong> '+(o.opinion_fr||'-')+'</div></div>';
-})}
-h+='</div>';
-});
-rc.innerHTML=h||'<div class="alert alert-info">Öğrenci bulunamadı</div>';
-}
-async function downloadClassOpinions(){
-const cid=$('opClassSel').value;
-if(!cid)return alert('Sınıf seçin');
-const{data:cls}=await sb.from('classes').select('*').eq('id',cid).single();
-const{data:students}=await sb.from('students').select('*, classes(class_name)').eq('class_id',cid).order('full_name');
-const sids=(students||[]).map(s=>s.id);
-if(!sids.length)return alert('Öğrenci bulunamadı');
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',sids).order('student_id').order('created_at',{ascending:false});
-let csv='﻿"Öğrenci","Okul No","Sınıf","Öğretmen","Branş","Dönem","Görüş (TR)","Görüş (FR)","Tarih"
-';
-(students||[]).forEach(st=>{
-const stOps=(ops||[]).filter(o=>o.student_id===st.id);
-if(stOps.length){stOps.forEach(o=>{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","'+(o.teachers?.full_name||'')+'","'+(o.teachers?.branch||'')+'","'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"
-';
-})}else{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","","","","Görüş yok","",""
-';
-}});
-const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-const url=URL.createObjectURL(blob);
-const a=document.createElement('a');
-a.href=url;a.download='gorusler_'+(cls?.class_name||'sinif')+'.csv';
-document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-}
-async function generateGeminiSummary(studentId,studentName){
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId);
-if(!ops?.length)return alert('Bu öğrenci için görüş bulunamadı');
-let context='Öğrenci: '+studentName+'
-
-';
-ops.forEach(o=>{context+='Öğretmen: '+(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+')
-Görüş: '+(o.opinion_tr||o.opinion_fr||'-')+'
-
-'});
-const prompt='Aşağıdaki öğretmen görüşlerini analiz ederek öğrenci hakkında kapsamlı bir özet paragraf yaz. Güçlü yönleri, gelişim alanlarını ve önerileri içersin. Türkçe ve Fransızca olarak ayrı ayrı yaz.
-
-'+context;
-try{
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-return data?.candidates?.[0]?.content?.parts?.[0]?.text||'Özet oluşturulamadı';
-}catch(e){return 'Hata: '+e.message}
-}
-
-async function aiStudentAnalysis(sid){
-const rc=document.getElementById('aiAnalysisResult');
-if(!rc)return;
-rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapıyor...</div>';
-try{
-const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();
-const{data:entries}=await sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false}).limit(50);
-const{data:att}=await sb.from('attendance').select('*').eq('student_id',sid);
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',sid);
-const tot=att?.length||0,abs=att?.filter(a=>a.status==='absent').length||0,lat=att?.filter(a=>a.status==='late').length||0;
-let context='Öğrenci: '+st.full_name+' ('+( st.classes?.class_name||'')+')\n';
-context+='Devamsızlık: Toplam '+tot+' gün, '+abs+' gelmedi, '+lat+' geç kaldı\n\n';
-if(entries?.length){context+='Veri Kayıtları:\n';entries.forEach(e=>{context+=e.entry_date+' - '+e.data_type+': '+e.description+'\n'});context+='\n'}
-if(ops?.length){context+='Öğretmen Görüşleri:\n';ops.forEach(o=>{context+=(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+'): '+(o.opinion_tr||o.opinion_fr||'-')+'\n'})}
-const prompt='Aşağıdaki öğrenci verilerini analiz et. Türkçe olarak şu başlıklar altında bir rapor oluştur:\n1. Genel Değerlendirme\n2. Güçlü Yönler\n3. Gelişmesi Gereken Yönler\n4. Öneriler\n\n'+context;
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-const analysis=data?.candidates?.[0]?.content?.parts?.[0]?.text||'Analiz oluşturulamadı';
-rc.innerHTML='<div class="card" style="margin-top:16px"><div class="card-title">🤖 Gemini AI Analizi</div><div style="margin-top:12px;white-space:pre-wrap;font-size:14px;line-height:1.6">'+analysis.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div></div>';
-}catch(e){rc.innerHTML='<div class="alert alert-error">AI analiz hatası: '+e.message+'</div>'}
-}
-
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--text2:#6e6e73;--text3:#86868b;--accent:#0071e3;--accent-hover:#0077ED;--red:#ff3b30;--green:#34c759;--orange:#ff9500;--border:#d2d2d7;--border2:#e8e8ed;--radius:12px;--radius-lg:16px;--shadow:0 2px 12px rgba(0,0,0,.08);--shadow-lg:0 4px 24px rgba(0,0,0,.12);--font:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;--max-w:960px}
@@ -661,6 +519,7 @@ const analysis=data?.candidates?.[0]?.content?.parts?.[0]?.text||'Analiz oluştu
 rc.innerHTML='<div class="card" style="margin-top:16px"><div class="card-title">🤖 Gemini AI Analizi</div><div style="margin-top:12px;white-space:pre-wrap;font-size:14px;line-height:1.6">'+analysis.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div></div>';
 }catch(e){rc.innerHTML='<div class="alert alert-error">AI analiz hatası: '+e.message+'</div>'}
 }
+
 
 </script>
 
