@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Özel Arkas Piri Reis Anadolu Lisesi — Yönetim Sistemi</title>
+<title>Ozel Arkas Piri Reis Anadolu Lisesi - Yonetim Sistemi</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -156,391 +155,639 @@ tr:hover td{background:rgba(0,113,227,.03)}
 </div>
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalContent"></div></div>
 <script>
+
 const SUPABASE_URL='https://wrzsdecsembngeitfyxi.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyenNkZWNzZW1ibmdlaXRmeXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTA1MzIsImV4cCI6MjA5MDY4NjUzMn0.WVcmxpmFQ5w53gIUPIg-vWo1Kl09dHyHC_lyOhghi3w';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-
 const GEMINI_API_KEY='AIzaSyBFqY_7TDc0ejkN5naYTubzgzjZR4UWOEU';
 let currentUser=null;
 
+// ===== SESSION =====
 function getSession(){const r=sessionStorage.getItem('session')||localStorage.getItem('session');return r?JSON.parse(r):null}
 function setSession(u){const d=JSON.stringify(u);if(u.is_test_user)sessionStorage.setItem('session',d);else localStorage.setItem('session',d)}
 function clearSession(){sessionStorage.removeItem('session');localStorage.removeItem('session')}
-async function doLogin(){
-const username=$('loginUser').value.trim(),password=$('loginPass').value.trim();
-if(!username||!password)return showLoginAlert('Kullanıcı adı ve şifre gerekli','error');
-const btn=document.querySelector('button.btn-primary.btn-block');
-if(btn){btn.disabled=true;btn.textContent='Giriş yapılıyor...'}
-try{
-const{data:rows,error:e1}=await sb.from('users').select('*').eq('username',username);
-if(e1){
-if(btn){btn.disabled=false;btn.textContent='Giriş Yap'}
-return showLoginAlert('Veritabanı hatası: '+e1.message,'error');
-}
-if(!rows||rows.length===0){
-if(btn){btn.disabled=false;btn.textContent='Giriş Yap'}
-return showLoginAlert('"'+username+'" kullanıcısı bulunamadı.','error');
-}
-const user=rows[0];
-if(user.password_hash!==password){
-if(btn){btn.disabled=false;btn.textContent='Giriş Yap'}
-return showLoginAlert('Şifre hatalı.','error');
-}
-currentUser=user;setSession(user);showApp();
-}catch(ex){
-if(btn){btn.disabled=false;btn.textContent='Giriş Yap'}
-showLoginAlert('Bağlantı hatası: '+ex.message,'error');
-}
-}
-function doLogout(){if(currentUser?.is_test_user)clearTestData();clearSession();currentUser=null;$('appShell').style.display='none';$('loginScreen').style.display='flex'}
-async function clearTestData(){const sid=currentUser.id+'_test';await sb.from('student_data').delete().eq('session_id',sid);await sb.from('attendance').delete().eq('session_id',sid);await sb.from('substitutions').delete().eq('session_id',sid)}
-function showLoginAlert(msg,type){$('loginAlert').innerHTML='<div class="alert alert-'+type+'">'+msg+'</div>'}
-window.addEventListener('DOMContentLoaded',()=>{const s=getSession();if(s){currentUser=s;showApp()}$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()})});
-function showApp(){
-$('loginScreen').style.display='none';const shell=$('appShell');shell.style.display='flex';shell.style.flexDirection='column';shell.style.minHeight='100vh';
-const badge={admin:'👑 Admin',idareci:'🏢 İdareci',bolum_baskani:'📋 Bölüm Başkanı',ogretmen:'👨‍🏫 Öğretmen',ofis_calisani:'💼 Ofis'}[currentUser.role]||currentUser.role;
-$('userBadge').textContent=badge+' · '+currentUser.full_name;
-$('welcomeName').textContent=currentUser.full_name+' — '+new Date().toLocaleDateString('tr-TR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-$('adminPanel').style.display=isAdmin()?'block':'none';navigate('dashboard');
-}
-function navigate(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const el=$('pg-'+page);if(el){el.classList.add('active');window.scrollTo(0,0)}
-if(page==='students')showStudentTab('list');if(page==='attendance'){showAttendanceTab('take');const cb=$('csvDownloadBtn');if(cb)cb.style.display=canDownloadCSV()?'':'none'}if(page==='teachers')initTeacherPage();if(page==='admin-users')loadAdminUsers();if(page==='schedule-config')loadScheduleConfig()}
-function $(id){return document.getElementById(id)}
-function html(id,h){$(id).innerHTML=h}
-function showModal(content){$('modalContent').innerHTML=content;$('modalBg').classList.add('show')}
-function closeModal(){$('modalBg').classList.remove('show')}
 function sessionId(){return currentUser.id+(currentUser.is_test_user?'_test':'')}
-function today(){return new Date().toISOString().split('T')[0]}
-function isAdmin(){return currentUser?.role==='admin'}
-function canSubstitute(){return['admin','idareci','bolum_baskani'].includes(currentUser?.role)}
-function canDownloadCSV(){const allowed=['atil.celik@pirireis.k12.tr','tuba.sarac@pirireis.k12.tr','mert.pala@pirireis.k12.tr','caner.karamanli@pirireis.k12.tr'];return isAdmin()||allowed.includes(currentUser?.email)}
-function esc(s){return String(s).replace(/'/g,"\'")}
+
+// ===== LOGIN =====
+async function doLogin(){
+  const username=document.getElementById('loginUser').value.trim();
+  const password=document.getElementById('loginPass').value.trim();
+  if(!username||!password)return showLoginAlert('Kullanici adi ve sifre gerekli','error');
+  const btn=document.querySelector('button.btn-primary.btn-block');
+  if(btn){btn.disabled=true;btn.textContent='Giris yapiliyor...'}
+  try{
+    const{data:rows,error:e1}=await sb.from('users').select('*').eq('username',username);
+    if(e1){
+      if(btn){btn.disabled=false;btn.textContent='Giris Yap'}
+      return showLoginAlert('Veritabani hatasi: '+e1.message,'error');
+    }
+    if(!rows||rows.length===0){
+      if(btn){btn.disabled=false;btn.textContent='Giris Yap'}
+      return showLoginAlert('"'+username+'" kullanicisi bulunamadi.','error');
+    }
+    const user=rows[0];
+    if(user.password_hash!==password){
+      if(btn){btn.disabled=false;btn.textContent='Giris Yap'}
+      return showLoginAlert('Sifre hatali.','error');
+    }
+    currentUser=user;setSession(user);showApp();
+  }catch(ex){
+    if(btn){btn.disabled=false;btn.textContent='Giris Yap'}
+    showLoginAlert('Baglanti hatasi: '+ex.message,'error');
+  }
+}
+function doLogout(){
+  if(currentUser&&currentUser.is_test_user)clearTestData();
+  clearSession();currentUser=null;
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+}
+async function clearTestData(){
+  const sid=sessionId();
+  await sb.from('student_data').delete().eq('session_id',sid);
+  await sb.from('attendance').delete().eq('session_id',sid);
+  await sb.from('substitutions').delete().eq('session_id',sid);
+}
+function showLoginAlert(msg,type){document.getElementById('loginAlert').innerHTML='<div class="alert alert-'+type+'">'+msg+'</div>'}
+
+window.addEventListener('DOMContentLoaded',function(){
+  const s=getSession();
+  if(s){currentUser=s;showApp();}
+  document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+});
+
+// ===== APP SHELL =====
+function showApp(){
+  document.getElementById('loginScreen').style.display='none';
+  const shell=document.getElementById('appShell');
+  shell.style.display='flex';shell.style.flexDirection='column';shell.style.minHeight='100vh';
+  const badges={admin:'\uD83D\uDC51 Admin',idareci:'\uD83C\uDFE2 Idareci',bolum_baskani:'\uD83D\uDCCB Bolum Baskani',ogretmen:'\uD83D\uDC68\u200D\uD83C\uDFEB Ogretmen',ofis_calisani:'\uD83D\uDCBC Ofis'};
+  document.getElementById('userBadge').textContent=(badges[currentUser.role]||currentUser.role)+' \u00B7 '+currentUser.full_name;
+  document.getElementById('welcomeName').textContent=currentUser.full_name+' \u2014 '+new Date().toLocaleDateString('tr-TR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('adminPanel').style.display=isAdmin()?'block':'none';
+  navigate('dashboard');
+}
+function navigate(page){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  const el=document.getElementById('pg-'+page);
+  if(el){el.classList.add('active');window.scrollTo(0,0);}
+  if(page==='students')showStudentTab('list');
+  if(page==='attendance'){showAttendanceTab('take');const cb=document.getElementById('csvDownloadBtn');if(cb)cb.style.display=canDownloadCSV()?'':'none';}
+  if(page==='teachers')initTeacherPage();
+  if(page==='admin-users')loadAdminUsers();
+  if(page==='schedule-config')loadScheduleConfig();
+}
+function gi(id){return document.getElementById(id)}
+function sh(id,h){gi(id).innerHTML=h}
+function showModal(content){gi('modalContent').innerHTML=content;gi('modalBg').classList.add('show');}
+function closeModal(){gi('modalBg').classList.remove('show');}
+function today(){return new Date().toISOString().split('T')[0];}
+function isAdmin(){return currentUser&&currentUser.role==='admin';}
+function canSubstitute(){return currentUser&&['admin','idareci','bolum_baskani'].includes(currentUser.role);}
+function canDownloadCSV(){
+  const allowed=['atil.celik@pirireis.k12.tr','tuba.sarac@pirireis.k12.tr','mert.pala@pirireis.k12.tr','caner.karamanli@pirireis.k12.tr'];
+  return isAdmin()||(currentUser&&allowed.includes(currentUser.email));
+}
+function esc(s){return String(s).replace(/'/g,"\\'");}
 
 // ===== STUDENTS =====
 async function showStudentTab(tab){
-const c=$('student-content');
-if(tab==='list'){
-c.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yükleniyor…</div>';
-const{data:students}=await sb.from('students').select('*, classes(class_name, id)').order('full_name');
-const{data:classes}=await sb.from('classes').select('*').order('id');
-let fOpts='<option value="">Tümü</option>'+(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
-let h='<div class="card"><div class="card-header"><span class="card-title">Öğrenciler ('+(students?.length||0)+')</span></div>';
-h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div class="search-box" style="flex:1;margin:0;min-width:200px"><input type="text" class="form-input" placeholder="Ara..." oninput="filterRows(this.value,\'student-tr\')"></div>';
-h+='<select class="form-input" style="width:auto" onchange="filterClass(this.value)">'+fOpts+'</select></div>';
-h+='<div class="table-wrap"><table><thead><tr><th>No</th><th>Ad Soyad</th><th>Sınıf</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';
-(students||[]).forEach(s=>{
-h+='<tr class="student-tr" data-class="'+(s.classes?.id||'')+'">';
-h+='<td>'+s.student_number+'</td><td>'+s.full_name+'</td><td>'+(s.classes?.class_name||'-')+'</td>';
-if(isAdmin()) h+='<td><button class="btn btn-xs btn-secondary" onclick="editStudentModal('+s.id+',\''+esc(s.full_name)+'\',\''+s.student_number+'\','+(s.class_id||'null')+')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteStudent('+s.id+',\''+esc(s.full_name)+'\')">Sil</button></td>';
-h+='</tr>';
-});
-h+='</tbody></table></div></div>';c.innerHTML=h;
-} else if(tab==='add'){
-const{data:classes}=await sb.from('classes').select('*').order('id');
-let opts=(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
-c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Ekle</div><div id="addStudentAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="sName" class="form-input"></div><div class="form-group"><label>Okul Numarası</label><input id="sNumber" class="form-input"></div><div class="form-group"><label>Sınıf</label><select id="sClass" class="form-input"><option value="">Seçin</option>'+opts+'</select></div><button class="btn btn-primary" onclick="addStudent()">Ekle</button></div><div class="card"><div class="card-title" style="margin-bottom:16px">Toplu Yükleme (CSV)</div><p style="font-size:13px;color:var(--text2);margin-bottom:12px">Format: ad_soyad,okul_no,sinif_id</p><textarea id="csvData" class="form-input" rows="5" placeholder="AHMET YILMAZ,201,1"></textarea><button class="btn btn-secondary" onclick="bulkAddStudents()" style="margin-top:12px">Toplu Ekle</button></div>';
-} else if(tab==='data-entry'){
-const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-const{data:students}=await sb.from('students').select('*').order('full_name');
-let tO=(teachers||[]).map(t=>'<option value="'+t.id+'" data-branch="'+t.branch+'">'+t.full_name+' ('+t.branch+')</option>').join('');
-let sO=(students||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' ('+s.student_number+')</option>').join('');
-c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Veri Girişi</div><div id="dataEntryAlert"></div><div class="form-group"><label>Tarih</label><input id="deDate" type="date" class="form-input" value="'+today()+'"></div><div class="form-group"><label>Öğretmen</label><select id="deTeacher" class="form-input" onchange="updateBranch()"><option value="">Seçin</option>'+tO+'</select></div><div class="form-group"><label>Branş</label><input id="deBranch" class="form-input" readonly></div><div class="form-group"><label>Öğrenci</label><select id="deStudent" class="form-input"><option value="">Seçin</option>'+sO+'</select></div><div class="form-group"><label>Veri Türü</label><select id="deType" class="form-input"><option value="">Seçin</option><option>Akademik Başarı</option><option>Davranış</option><option>Sosyal Gelişim</option><option>Katılım</option><option>Proje/Ödev</option><option>Sınav Sonucu</option><option>Görüşme Notu</option><option>Diğer</option></select></div><div class="form-group"><label>Açıklama</label><textarea id="deDesc" class="form-input" placeholder="Detaylı açıklama..."></textarea></div><button class="btn btn-primary" onclick="saveDataEntry()">Kaydet</button></div>';
-} else if(tab==='report'){
-const{data:students}=await sb.from('students').select('*, classes(class_name)').order('full_name');
-let sO=(students||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' — '+(s.classes?.class_name||'')+'</option>').join('');
-c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğrenci Raporu</div><div class="form-group"><label>Öğrenci</label><select id="repStudent" class="form-input"><option value="">Seçin</option>'+sO+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Başlangıç</label><input id="repFrom" type="date" class="form-input"></div><div class="form-group" style="flex:1"><label>Bitiş</label><input id="repTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="generateStudentReport()">Rapor Oluştur</button></div><div id="reportResult"></div>';
-}
-}
-} else if(tab==='opinions'){
-const isTeacher=currentUser.role==='ogretmen';
-const isAdminOrIdareci=['admin','idareci','bolum_baskani'].includes(currentUser.role);
-if(isTeacher){
-// Öğretmen: kendi derslerine giren öğrenciler
-const{data:tch}=await sb.from('teachers').select('*').eq('full_name',currentUser.full_name).single();
-if(!tch){c.innerHTML='<div class="alert alert-error">Öğretmen kaydınız bulunamadı</div>';return}
-const{data:sched}=await sb.from('teacher_schedule').select('class_info').eq('teacher_id',tch.id);
-const classInfos=[...new Set((sched||[]).map(s=>s.class_info))];
-const{data:classes}=await sb.from('classes').select('*');
-const matchedClassIds=[];
-(classes||[]).forEach(cl=>{classInfos.forEach(ci=>{if(ci&&cl.class_name&&cl.class_name.toLowerCase().includes(ci.toLowerCase()))matchedClassIds.push(cl.id)})});
-// Also match by section letter (A, B, C, D, A-B, C-D etc)
-(classes||[]).forEach(cl=>{classInfos.forEach(ci=>{if(ci){const sections=ci.split('-');sections.forEach(sec=>{if(cl.section&&cl.section.toLowerCase()===sec.trim().toLowerCase()&&!matchedClassIds.includes(cl.id))matchedClassIds.push(cl.id)})}})});
-let{data:students}=await sb.from('students').select('*, classes(class_name, id)').in('class_id',matchedClassIds.length?matchedClassIds:[0]).order('full_name');
-if(!students||!students.length){
-// Fallback: show all students
-const{data:allSt}=await sb.from('students').select('*, classes(class_name, id)').order('full_name');
-students=allSt||[];
-}
-let h='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Görüşleri</div>';
-h+='<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Derslerinize giren öğrenciler için görüş yazabilirsiniz. Görüşünüz otomatik olarak Türkçe ve Fransızca kaydedilir.</p>';
-h+='<div id="opinionAlert"></div>';
-(students).forEach(s=>{
-h+='<div class="student-row" style="flex-direction:column;align-items:stretch"><div style="display:flex;justify-content:space-between;align-items:center"><div><span class="name">'+s.full_name+'</span><span class="number"> — '+(s.classes?.class_name||'-')+'</span></div><div style="display:flex;gap:6px"><button class="btn btn-xs btn-secondary" onclick="viewPastOpinions('+s.id+',\''+s.full_name.replace(/'/g,"\\'")+'\')">\ud83d\udcdc Geçmiş</button><button class="btn btn-xs btn-primary" onclick="writeOpinionModal('+s.id+',\''+s.full_name.replace(/'/g,"\\'")+'\','+tch.id+')">✍️ Görüş Yaz</button></div></div></div>';
-});
-h+='</div>';c.innerHTML=h;
-} else if(isAdminOrIdareci){
-// Admin/İdareci: tüm sınıflar, toplu indirme
-const{data:classes}=await sb.from('classes').select('*').order('id');
-let clOpts=(classes||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');
-c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Görüşleri — Yönetim</div><p style="font-size:13px;color:var(--text2);margin-bottom:16px">Sınıf bazlı görüşleri görüntüleyin ve indirin.</p><div class="form-group"><label>Sınıf Seçin</label><select id="opClassSel" class="form-input"><option value="">Seçin</option>'+clOpts+'</select></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="viewClassOpinions()">Görüntüle</button><button class="btn btn-secondary btn-sm" onclick="downloadClassOpinions()">📥 İndir (CSV)</button></div><div id="opinionResult" style="margin-top:16px"></div></div>';
-} else {
-c.innerHTML='<div class="alert alert-info">Bu bölüme erişim yetkiniz yok.</div>';
-}
+  const c=gi('student-content');
+  if(tab==='list'){
+    c.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yukleniyor...</div>';
+    const{data:students}=await sb.from('students').select('*, classes(class_name, id)').order('full_name');
+    const{data:classes}=await sb.from('classes').select('*').order('id');
+    let fOpts='<option value="">Tumu</option>'+(classes||[]).map(function(cl){return '<option value="'+cl.id+'">'+cl.class_name+'</option>';}).join('');
+    let h='<div class="card"><div class="card-header"><span class="card-title">Ogrenciler ('+(students?students.length:0)+')</span></div>';
+    h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><div class="search-box" style="flex:1;margin:0;min-width:200px"><input type="text" class="form-input" placeholder="Ara..." oninput="filterRows(this.value,\'student-tr\')"></div>';
+    h+='<select class="form-input" style="width:auto" onchange="filterClass(this.value)">'+fOpts+'</select></div>';
+    h+='<div class="table-wrap"><table><thead><tr><th>No</th><th>Ad Soyad</th><th>Sinif</th>'+(isAdmin()?'<th>Islem</th>':'')+'</tr></thead><tbody>';
+    (students||[]).forEach(function(s){
+      h+='<tr class="student-tr" data-class="'+(s.classes?s.classes.id||'':'')+'">';
+      h+='<td>'+s.student_number+'</td><td>'+s.full_name+'</td><td>'+(s.classes?s.classes.class_name||'-':'-')+'</td>';
+      if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editStudentModal('+s.id+',\''+esc(s.full_name)+'\',\''+s.student_number+'\','+(s.class_id||'null')+')">Duzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteStudent('+s.id+',\''+esc(s.full_name)+'\')">Sil</button></td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table></div></div>';
+    c.innerHTML=h;
+  } else if(tab==='add'){
+    const{data:classes}=await sb.from('classes').select('*').order('id');
+    let opts=(classes||[]).map(function(cl){return '<option value="'+cl.id+'">'+cl.class_name+'</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogrenci Ekle</div><div id="addStudentAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="sName" class="form-input"></div><div class="form-group"><label>Okul Numarasi</label><input id="sNumber" class="form-input"></div><div class="form-group"><label>Sinif</label><select id="sClass" class="form-input"><option value="">Secin</option>'+opts+'</select></div><button class="btn btn-primary" onclick="addStudent()">Ekle</button></div><div class="card"><div class="card-title" style="margin-bottom:16px">Toplu Yukleme (CSV)</div><p style="font-size:13px;color:var(--text2);margin-bottom:12px">Format: ad_soyad,okul_no,sinif_id</p><textarea id="csvData" class="form-input" rows="5" placeholder="AHMET YILMAZ,201,1"></textarea><button class="btn btn-secondary" onclick="bulkAddStudents()" style="margin-top:12px">Toplu Ekle</button></div>';
+  } else if(tab==='data-entry'){
+    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+    const{data:students}=await sb.from('students').select('*').order('full_name');
+    let tO=(teachers||[]).map(function(t){return '<option value="'+t.id+'" data-branch="'+t.branch+'">'+t.full_name+' ('+t.branch+')</option>';}).join('');
+    let sO=(students||[]).map(function(s){return '<option value="'+s.id+'">'+s.full_name+' ('+s.student_number+')</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogrenci Veri Girisi</div><div id="dataEntryAlert"></div><div class="form-group"><label>Tarih</label><input id="deDate" type="date" class="form-input" value="'+today()+'"></div><div class="form-group"><label>Ogretmen</label><select id="deTeacher" class="form-input" onchange="updateBranch()"><option value="">Secin</option>'+tO+'</select></div><div class="form-group"><label>Brans</label><input id="deBranch" class="form-input" readonly></div><div class="form-group"><label>Ogrenci</label><select id="deStudent" class="form-input"><option value="">Secin</option>'+sO+'</select></div><div class="form-group"><label>Veri Turu</label><select id="deType" class="form-input"><option value="">Secin</option><option>Akademik Basari</option><option>Davranis</option><option>Sosyal Gelisim</option><option>Katilim</option><option>Proje/Odev</option><option>Sinav Sonucu</option><option>Gorusme Notu</option><option>Diger</option></select></div><div class="form-group"><label>Aciklama</label><textarea id="deDesc" class="form-input" placeholder="Detayli aciklama..."></textarea></div><button class="btn btn-primary" onclick="saveDataEntry()">Kaydet</button></div>';
+  } else if(tab==='report'){
+    const{data:students}=await sb.from('students').select('*, classes(class_name)').order('full_name');
+    let sO=(students||[]).map(function(s){return '<option value="'+s.id+'">'+s.full_name+' \u2014 '+(s.classes?s.classes.class_name||'':'')+'</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogrenci Raporu</div><div class="form-group"><label>Ogrenci</label><select id="repStudent" class="form-input"><option value="">Secin</option>'+sO+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Baslangic</label><input id="repFrom" type="date" class="form-input"></div><div class="form-group" style="flex:1"><label>Bitis</label><input id="repTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="generateStudentReport()">Rapor Olustur</button></div><div id="reportResult"></div>';
+  } else if(tab==='opinions'){
+    const isTeacher=currentUser.role==='ogretmen';
+    const isAdminOrIdareci=['admin','idareci','bolum_baskani'].includes(currentUser.role);
+    if(isTeacher){
+      const{data:tch}=await sb.from('teachers').select('*').eq('full_name',currentUser.full_name).single();
+      if(!tch){c.innerHTML='<div class="alert alert-error">Ogretmen kaydiniz bulunamadi</div>';return;}
+      const{data:sched}=await sb.from('teacher_schedule').select('class_info').eq('teacher_id',tch.id);
+      const classInfos=[...new Set((sched||[]).map(function(s){return s.class_info;}))];
+      const{data:classes}=await sb.from('classes').select('*');
+      const matchedClassIds=[];
+      (classes||[]).forEach(function(cl){classInfos.forEach(function(ci){if(ci&&cl.class_name&&cl.class_name.toLowerCase().includes(ci.toLowerCase()))matchedClassIds.push(cl.id);});});
+      (classes||[]).forEach(function(cl){classInfos.forEach(function(ci){if(ci){const sections=ci.split('-');sections.forEach(function(sec){if(cl.section&&cl.section.toLowerCase()===sec.trim().toLowerCase()&&!matchedClassIds.includes(cl.id))matchedClassIds.push(cl.id);});}});});
+      let{data:students}=await sb.from('students').select('*, classes(class_name, id)').in('class_id',matchedClassIds.length?matchedClassIds:[0]).order('full_name');
+      if(!students||!students.length){const{data:allSt}=await sb.from('students').select('*, classes(class_name, id)').order('full_name');students=allSt||[];}
+      let h='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogretmen Gorusleri</div>';
+      h+='<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Derslerinize giren ogrenciler icin gorusunuzu yazabilirsiniz.</p>';
+      h+='<div id="opinionAlert"></div>';
+      (students||[]).forEach(function(s){
+        h+='<div class="student-row"><div><span class="name">'+s.full_name+'</span><span class="number"> \u2014 '+(s.classes?s.classes.class_name||'-':'-')+'</span></div>';
+        h+='<div style="display:flex;gap:6px"><button class="btn btn-xs btn-secondary" onclick="viewPastOpinions('+s.id+',\''+esc(s.full_name)+'\')">Gecmis</button>';
+        h+='<button class="btn btn-xs btn-primary" onclick="writeOpinionModal('+s.id+',\''+esc(s.full_name)+'\','+tch.id+')">Gorup Yaz</button></div></div>';
+      });
+      h+='</div>';
+      c.innerHTML=h;
+    } else if(isAdminOrIdareci){
+      const{data:classes}=await sb.from('classes').select('*').order('id');
+      let clOpts=(classes||[]).map(function(cl){return '<option value="'+cl.id+'">'+cl.class_name+'</option>';}).join('');
+      c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogretmen Gorusleri \u2014 Yonetim</div><div class="form-group"><label>Sinif Secin</label><select id="opClassSel" class="form-input"><option value="">Secin</option>'+clOpts+'</select></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="viewClassOpinions()">Goruntule</button><button class="btn btn-secondary btn-sm" onclick="downloadClassOpinions()">Indir (CSV)</button></div><div id="opinionResult" style="margin-top:16px"></div></div>';
+    } else {
+      c.innerHTML='<div class="alert alert-info">Bu bolume erisim yetkiniz yok.</div>';
+    }
+  }
 }
 
-function filterRows(q,cls){q=q.toLowerCase();document.querySelectorAll('.'+cls).forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none'})}
-function filterClass(cid){document.querySelectorAll('.student-tr').forEach(tr=>{tr.style.display=(!cid||tr.dataset.class===cid)?'':'none'})}
-function updateBranch(){const s=$('deTeacher');$('deBranch').value=s.options[s.selectedIndex]?.dataset?.branch||''}
-async function addStudent(){const n=$('sName').value.trim(),num=$('sNumber').value.trim(),cl=$('sClass').value;if(!n||!num)return html('addStudentAlert','<div class="alert alert-error">Ad ve numara gerekli</div>');const{error}=await sb.from('students').insert({full_name:n,student_number:num,class_id:cl||null});if(error)return html('addStudentAlert','<div class="alert alert-error">'+error.message+'</div>');html('addStudentAlert','<div class="alert alert-success">Öğrenci eklendi!</div>');$('sName').value='';$('sNumber').value=''}
-async function bulkAddStudents(){const lines=$('csvData').value.trim().split('\n').filter(l=>l.trim());if(!lines.length)return alert('CSV verisi girin');const rows=lines.map(l=>{const p=l.split(',');return{full_name:p[0]?.trim(),student_number:p[1]?.trim(),class_id:parseInt(p[2])||null}});const{error}=await sb.from('students').insert(rows);if(error)return alert('Hata: '+error.message);alert(rows.length+' öğrenci eklendi!');showStudentTab('list')}
-function editStudentModal(id,name,num,cid){sb.from('classes').select('*').order('id').then(({data:classes})=>{let o=(classes||[]).map(cl=>'<option value="'+cl.id+'" '+(cl.id===cid?'selected':'')+'>'+cl.class_name+'</option>').join('');showModal('<h3>Öğrenci Düzenle</h3><div id="editStudentAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="esName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Okul No</label><input id="esNum" class="form-input" value="'+num+'"></div><div class="form-group"><label>Sınıf</label><select id="esClass" class="form-input"><option value="">Seçin</option>'+o+'</select></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateStudent('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')})}
-async function updateStudent(id){const n=$('esName').value.trim(),num=$('esNum').value.trim(),cl=$('esClass').value;if(!n||!num)return html('editStudentAlert','<div class="alert alert-error">Ad ve numara gerekli</div>');const{error}=await sb.from('students').update({full_name:n,student_number:num,class_id:cl||null}).eq('id',id);if(error)return html('editStudentAlert','<div class="alert alert-error">'+error.message+'</div>');closeModal();showStudentTab('list')}
-async function deleteStudent(id,name){if(!confirm('"'+name+'" silinecek. Emin misiniz?'))return;await sb.from('student_data').delete().eq('student_id',id);await sb.from('attendance').delete().eq('student_id',id);await sb.from('students').delete().eq('id',id);showStudentTab('list')}
-async function saveDataEntry(){const tid=$('deTeacher').value,sid=$('deStudent').value,dt=$('deType').value,desc=$('deDesc').value.trim(),date=$('deDate').value,br=$('deBranch').value;if(!sid||!dt||!desc)return html('dataEntryAlert','<div class="alert alert-error">Öğrenci, tür ve açıklama gerekli</div>');const{error}=await sb.from('student_data').insert({student_id:parseInt(sid),teacher_id:tid?parseInt(tid):null,teacher_branch:br,data_type:dt,description:desc,entry_date:date,created_by:currentUser.id,session_id:currentUser.is_test_user?sessionId():null});if(error)return html('dataEntryAlert','<div class="alert alert-error">'+error.message+'</div>');html('dataEntryAlert','<div class="alert alert-success">Kaydedildi!</div>');$('deDesc').value=''}
-async function generateStudentReport(){const sid=$('repStudent').value;if(!sid)return alert('Öğrenci seçin');const rc=$('reportResult');rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();let q=sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false});const from=$('repFrom').value,to=$('repTo').value;if(from)q=q.gte('entry_date',from);if(to)q=q.lte('entry_date',to);const{data:entries}=await q;const{data:att}=await sb.from('attendance').select('*').eq('student_id',sid);const tot=att?.length||0,abs=att?.filter(a=>a.status==='absent').length||0,lat=att?.filter(a=>a.status==='late').length||0,pres=tot-abs-lat;let h='<div class="card" style="margin-top:16px"><div class="card-title">'+st.full_name+' — '+(st.classes?.class_name||'')+'</div><div class="stats-row" style="margin-top:16px"><div class="stat-card"><div class="val">'+(entries?.length||0)+'</div><div class="label">Kayıt</div></div><div class="stat-card"><div class="val" style="color:var(--green)">'+pres+'</div><div class="label">Geldi</div></div><div class="stat-card"><div class="val" style="color:var(--red)">'+abs+'</div><div class="label">Gelmedi</div></div><div class="stat-card"><div class="val" style="color:var(--orange)">'+lat+'</div><div class="label">Geç</div></div></div>';if(entries?.length){h+='<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Öğretmen</th><th>Açıklama</th></tr></thead><tbody>';entries.forEach(e=>{h+='<tr><td>'+e.entry_date+'</td><td>'+e.data_type+'</td><td>'+(e.teachers?.full_name||'-')+'</td><td style="max-width:300px">'+e.description+'</td></tr>'});h+='</tbody></table></div>'}h+='<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="aiStudentAnalysis('+sid+')">🤖 Gemini AI Analizi</button></div>';h+='</div>';h+='<div id="aiAnalysisResult"></div>';rc.innerHTML=h}
+function filterRows(q,cls){q=q.toLowerCase();document.querySelectorAll('.'+cls).forEach(function(tr){tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});}
+function filterClass(cid){document.querySelectorAll('.student-tr').forEach(function(tr){tr.style.display=(!cid||tr.dataset.class===cid)?'':'none';});}
+function updateBranch(){const s=gi('deTeacher');gi('deBranch').value=s.options[s.selectedIndex]&&s.options[s.selectedIndex].dataset?s.options[s.selectedIndex].dataset.branch||'':'';}
+async function addStudent(){
+  const n=gi('sName').value.trim(),num=gi('sNumber').value.trim(),cl=gi('sClass').value;
+  if(!n||!num)return sh('addStudentAlert','<div class="alert alert-error">Ad ve numara gerekli</div>');
+  const{error}=await sb.from('students').insert({full_name:n,student_number:num,class_id:cl||null});
+  if(error)return sh('addStudentAlert','<div class="alert alert-error">'+error.message+'</div>');
+  sh('addStudentAlert','<div class="alert alert-success">Ogrenci eklendi!</div>');
+  gi('sName').value='';gi('sNumber').value='';
+}
+async function bulkAddStudents(){
+  const lines=gi('csvData').value.trim().split('\n').filter(function(l){return l.trim();});
+  if(!lines.length)return alert('CSV verisi girin');
+  const rows=lines.map(function(l){const p=l.split(',');return{full_name:(p[0]||'').trim(),student_number:(p[1]||'').trim(),class_id:parseInt(p[2])||null};});
+  const{error}=await sb.from('students').insert(rows);
+  if(error)return alert('Hata: '+error.message);
+  alert(rows.length+' ogrenci eklendi!');showStudentTab('list');
+}
+function editStudentModal(id,name,num,cid){
+  sb.from('classes').select('*').order('id').then(function(res){
+    const classes=res.data||[];
+    let o=classes.map(function(cl){return '<option value="'+cl.id+'" '+(cl.id===cid?'selected':'')+'>'+cl.class_name+'</option>';}).join('');
+    showModal('<h3>Ogrenci Duzenle</h3><div id="editStudentAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="esName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Okul No</label><input id="esNum" class="form-input" value="'+num+'"></div><div class="form-group"><label>Sinif</label><select id="esClass" class="form-input"><option value="">Secin</option>'+o+'</select></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateStudent('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+  });
+}
+async function updateStudent(id){
+  const n=gi('esName').value.trim(),num=gi('esNum').value.trim(),cl=gi('esClass').value;
+  if(!n||!num)return sh('editStudentAlert','<div class="alert alert-error">Ad ve numara gerekli</div>');
+  const{error}=await sb.from('students').update({full_name:n,student_number:num,class_id:cl||null}).eq('id',id);
+  if(error)return sh('editStudentAlert','<div class="alert alert-error">'+error.message+'</div>');
+  closeModal();showStudentTab('list');
+}
+async function deleteStudent(id,name){
+  if(!confirm('"'+name+'" silinecek. Emin misiniz?'))return;
+  await sb.from('student_data').delete().eq('student_id',id);
+  await sb.from('attendance').delete().eq('student_id',id);
+  await sb.from('students').delete().eq('id',id);
+  showStudentTab('list');
+}
+async function saveDataEntry(){
+  const tid=gi('deTeacher').value,sid=gi('deStudent').value,dt=gi('deType').value,desc=gi('deDesc').value.trim(),date=gi('deDate').value,br=gi('deBranch').value;
+  if(!sid||!dt||!desc)return sh('dataEntryAlert','<div class="alert alert-error">Ogrenci, tur ve aciklama gerekli</div>');
+  const{error}=await sb.from('student_data').insert({student_id:parseInt(sid),teacher_id:tid?parseInt(tid):null,teacher_branch:br,data_type:dt,description:desc,entry_date:date,created_by:currentUser.id,session_id:currentUser.is_test_user?sessionId():null});
+  if(error)return sh('dataEntryAlert','<div class="alert alert-error">'+error.message+'</div>');
+  sh('dataEntryAlert','<div class="alert alert-success">Kaydedildi!</div>');gi('deDesc').value='';
+}
+async function generateStudentReport(){
+  const sid=gi('repStudent').value;
+  if(!sid)return alert('Ogrenci secin');
+  const rc=gi('reportResult');
+  rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+  const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();
+  let q=sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false});
+  const from=gi('repFrom').value,to=gi('repTo').value;
+  if(from)q=q.gte('entry_date',from);
+  if(to)q=q.lte('entry_date',to);
+  const{data:entries}=await q;
+  const{data:att}=await sb.from('attendance').select('*').eq('student_id',sid);
+  const tot=(att||[]).length,abs=(att||[]).filter(function(a){return a.status==='absent';}).length,lat=(att||[]).filter(function(a){return a.status==='late';}).length,pres=tot-abs-lat;
+  let h='<div class="card" style="margin-top:16px"><div class="card-title">'+st.full_name+' \u2014 '+(st.classes?st.classes.class_name||'':'')+'</div>';
+  h+='<div class="stats-row" style="margin-top:16px"><div class="stat-card"><div class="val">'+((entries||[]).length)+'</div><div class="label">Kayit</div></div><div class="stat-card"><div class="val" style="color:var(--green)">'+pres+'</div><div class="label">Geldi</div></div><div class="stat-card"><div class="val" style="color:var(--red)">'+abs+'</div><div class="label">Gelmedi</div></div><div class="stat-card"><div class="val" style="color:var(--orange)">'+lat+'</div><div class="label">Gec</div></div></div>';
+  if((entries||[]).length){
+    h+='<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Tur</th><th>Ogretmen</th><th>Aciklama</th></tr></thead><tbody>';
+    entries.forEach(function(e){h+='<tr><td>'+e.entry_date+'</td><td>'+e.data_type+'</td><td>'+(e.teachers?e.teachers.full_name||'-':'-')+'</td><td style="max-width:300px">'+e.description+'</td></tr>';});
+    h+='</tbody></table></div>';
+  }
+  h+='<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="aiStudentAnalysis('+sid+')">Gemini AI Analizi</button></div></div>';
+  h+='<div id="aiAnalysisResult"></div>';
+  rc.innerHTML=h;
+}
 
 // ===== ATTENDANCE =====
 let attData={};
-async function showAttendanceTab(tab){const c=$('attendance-content');if(tab==='take'){const{data:cls}=await sb.from('classes').select('*').order('id');let o=(cls||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Yoklama Al</div><div class="form-group"><label>Sınıf</label><select id="attClass" class="form-input" onchange="loadAttStudents()"><option value="">Seçin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="attDate" type="date" class="form-input" value="'+today()+'"></div><div id="attStudentList"></div><div id="attAlert" style="margin-top:12px"></div></div>'}else if(tab==='late'){const{data:cls}=await sb.from('classes').select('*').order('id');let o=(cls||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Geç Gelen Öğrenci</div><div class="form-group"><label>Sınıf</label><select id="lateClass" class="form-input" onchange="loadLate()"><option value="">Seçin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="lateDate" type="date" class="form-input" value="'+today()+'"></div><div id="lateList"></div></div>'}else if(tab==='report'){const{data:sts}=await sb.from('students').select('*, classes(class_name)').order('full_name');let o=(sts||[]).map(s=>'<option value="'+s.id+'">'+s.full_name+' — '+(s.classes?.class_name||'')+'</option>').join('');c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Yoklama Raporu</div><div class="form-group"><label>Öğrenci</label><select id="arSt" class="form-input"><option value="">Tümü</option>'+o+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Başlangıç</label><input id="arFrom" type="date" class="form-input"></div><div class="form-group" style="flex:1"><label>Bitiş</label><input id="arTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="genAttReport()">Rapor</button></div><div id="arResult"></div>'}else if(tab==='csv'&&canDownloadCSV()){const{data:cls}=await sb.from('classes').select('*').order('id');let o=(cls||[]).map(cl=>'<option value="'+cl.id+'">'+cl.class_name+'</option>').join('');c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">📥 Yoklama CSV İndir</div><p style="font-size:13px;color:var(--text2);margin-bottom:16px">Günlük yoklama verilerini CSV formatında indirin.</p><div class="form-group"><label>Sınıf</label><select id="csvClass" class="form-input"><option value="">Tüm sınıflar</option>'+o+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Başlangıç Tarihi</label><input id="csvFrom" type="date" class="form-input" value="'+today()+'"></div><div class="form-group" style="flex:1"><label>Bitiş Tarihi</label><input id="csvTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="downloadAttCSV()">📥 CSV İndir</button><div id="csvAlert" style="margin-top:12px"></div></div>'}}
-async function loadAttStudents(){const cid=$('attClass').value;if(!cid)return;const{data:sts}=await sb.from('students').select('*').eq('class_id',cid).order('full_name');attData={};(sts||[]).forEach(s=>attData[s.id]='present');let h='<div style="margin-top:16px">';(sts||[]).forEach(s=>{h+='<div class="student-row"><div><span class="name">'+s.full_name+'</span><span class="number">'+s.student_number+'</span></div><div class="status-btns"><button class="status-btn present" id="att-p-'+s.id+'" onclick="setAtt('+s.id+',\'present\')">Geldi ✓</button><button class="status-btn" id="att-a-'+s.id+'" onclick="setAtt('+s.id+',\'absent\')">Gelmedi ✗</button></div></div>'});h+='<button class="btn btn-primary btn-block" onclick="saveAtt()" style="margin-top:16px">Yoklamayı Kaydet</button></div>';$('attStudentList').innerHTML=h}
-function setAtt(sid,st){attData[sid]=st;$('att-p-'+sid).className='status-btn'+(st==='present'?' present':'');$('att-a-'+sid).className='status-btn'+(st==='absent'?' absent':'')}
-async function saveAtt(){const cid=$('attClass').value,date=$('attDate').value;const rows=Object.entries(attData).map(([sid,st])=>({student_id:parseInt(sid),class_id:parseInt(cid),attendance_date:date,status:st,created_by:currentUser.id,session_id:currentUser.is_test_user?sessionId():null}));const sids=Object.keys(attData).map(Number);for(const sid of sids){await sb.from('attendance').delete().eq('student_id',sid).eq('attendance_date',date)}const{error}=await sb.from('attendance').insert(rows);html('attAlert',error?'<div class="alert alert-error">'+error.message+'</div>':'<div class="alert alert-success">Yoklama kaydedildi!</div>')}
-async function loadLate(){const cid=$('lateClass').value,date=$('lateDate').value;if(!cid)return;const{data:abs}=await sb.from('attendance').select('*, students(full_name, student_number)').eq('class_id',cid).eq('attendance_date',date).eq('status','absent');if(!abs?.length){$('lateList').innerHTML='<div class="alert alert-info" style="margin-top:12px">Gelmedi kaydı yok</div>';return}let h='<div style="margin-top:16px">';abs.forEach(a=>{h+='<div class="student-row"><div><span class="name">'+a.students.full_name+'</span><span class="number">'+a.students.student_number+'</span></div><div class="status-btns"><button class="status-btn" onclick="markLate('+a.id+',this)">Geç Geldi 🕐</button></div></div>'});h+='</div>';$('lateList').innerHTML=h}
-async function markLate(id,btn){const t=prompt('Geliş saati (ör: 09:30)');if(!t)return;await sb.from('attendance').update({status:'late',late_time:t}).eq('id',id);btn.className='status-btn late';btn.textContent='Geç ('+t+') ✓';btn.disabled=true}
-async function genAttReport(){const sid=$('arSt').value,from=$('arFrom').value,to=$('arTo').value;const rc=$('arResult');rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';let q=sb.from('attendance').select('*, students(full_name,student_number), classes(class_name)');if(sid)q=q.eq('student_id',sid);if(from)q=q.gte('attendance_date',from);if(to)q=q.lte('attendance_date',to);const{data}=await q.order('attendance_date',{ascending:false});if(!data?.length){rc.innerHTML='<div class="alert alert-info" style="margin-top:16px">Kayıt yok</div>';return}const g={};data.forEach(r=>{const k=r.student_id;if(!g[k])g[k]={name:r.students.full_name,num:r.students.student_number,cls:r.classes?.class_name,recs:[]};g[k].recs.push(r)});let h='<div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Yoklama Raporu</div><div class="table-wrap"><table><thead><tr><th>Öğrenci</th><th>Sınıf</th><th>Geldi</th><th>Gelmedi</th><th>Geç</th><th>%</th></tr></thead><tbody>';Object.values(g).forEach(v=>{const t=v.recs.length,a=v.recs.filter(r=>r.status==='absent').length,l=v.recs.filter(r=>r.status==='late').length,p=t-a-l;h+='<tr><td>'+v.name+' ('+v.num+')</td><td>'+(v.cls||'-')+'</td><td style="color:var(--green)">'+p+'</td><td style="color:var(--red)">'+a+'</td><td style="color:var(--orange)">'+l+'</td><td>'+(t?Math.round(a/t*100):0)+'%</td></tr>'});h+='</tbody></table></div></div>';rc.innerHTML=h}
-
-// ===== CSV DOWNLOAD =====
+async function showAttendanceTab(tab){
+  const c=gi('attendance-content');
+  if(tab==='take'){
+    const{data:cls}=await sb.from('classes').select('*').order('id');
+    let o=(cls||[]).map(function(cl){return '<option value="'+cl.id+'">'+cl.class_name+'</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Yoklama Al</div><div class="form-group"><label>Sinif</label><select id="attClass" class="form-input" onchange="loadAttStudents()"><option value="">Secin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="attDate" type="date" class="form-input" value="'+today()+'"></div><div id="attStudentList"></div><div id="attAlert" style="margin-top:12px"></div></div>';
+  } else if(tab==='late'){
+    const{data:cls}=await sb.from('classes').select('*').order('id');
+    let o=(cls||[]).map(function(cl){return '<option value="'+cl.id+'">'+cl.class_name+'</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Gec Gelen Ogrenci</div><div class="form-group"><label>Sinif</label><select id="lateClass" class="form-input" onchange="loadLate()"><option value="">Secin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="lateDate" type="date" class="form-input" value="'+today()+'"></div><div id="lateList"></div></div>';
+  } else if(tab==='report'){
+    const{data:sts}=await sb.from('students').select('*, classes(class_name)').order('full_name');
+    let o=(sts||[]).map(function(s){return '<option value="'+s.id+'">'+s.full_name+' \u2014 '+(s.classes?s.classes.class_name||'':'')+'</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Yoklama Raporu</div><div class="form-group"><label>Ogrenci</label><select id="arSt" class="form-input"><option value="">Tumu</option>'+o+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Baslangic</label><input id="arFrom" type="date" class="form-input"></div><div class="form-group" style="flex:1"><label>Bitis</label><input id="arTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="genAttReport()">Rapor</button></div><div id="arResult"></div>';
+  } else if(tab==='csv'&&canDownloadCSV()){
+    const{data:cls}=await sb.from('classes').select('*').order('id');
+    let o=(cls||[]).map(function(cl){return '<option value="'+cl.id+'">'+cl.class_name+'</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Yoklama CSV Indir</div><div class="form-group"><label>Sinif</label><select id="csvClass" class="form-input"><option value="">Tum siniflar</option>'+o+'</select></div><div style="display:flex;gap:12px"><div class="form-group" style="flex:1"><label>Baslangic</label><input id="csvFrom" type="date" class="form-input" value="'+today()+'"></div><div class="form-group" style="flex:1"><label>Bitis</label><input id="csvTo" type="date" class="form-input" value="'+today()+'"></div></div><button class="btn btn-primary" onclick="downloadAttCSV()">CSV Indir</button><div id="csvAlert" style="margin-top:12px"></div></div>';
+  }
+}
+async function loadAttStudents(){
+  const cid=gi('attClass').value;
+  if(!cid)return;
+  const{data:sts}=await sb.from('students').select('*').eq('class_id',cid).order('full_name');
+  attData={};(sts||[]).forEach(function(s){attData[s.id]='present';});
+  let h='<div style="margin-top:16px">';
+  (sts||[]).forEach(function(s){h+='<div class="student-row"><div><span class="name">'+s.full_name+'</span><span class="number">'+s.student_number+'</span></div><div class="status-btns"><button class="status-btn present" id="att-p-'+s.id+'" onclick="setAtt('+s.id+',\'present\')">Geldi</button><button class="status-btn" id="att-a-'+s.id+'" onclick="setAtt('+s.id+',\'absent\')">Gelmedi</button></div></div>';});
+  h+='<button class="btn btn-primary btn-block" onclick="saveAtt()" style="margin-top:16px">Yoklamayi Kaydet</button></div>';
+  gi('attStudentList').innerHTML=h;
+}
+function setAtt(sid,st){
+  attData[sid]=st;
+  gi('att-p-'+sid).className='status-btn'+(st==='present'?' present':'');
+  gi('att-a-'+sid).className='status-btn'+(st==='absent'?' absent':'');
+}
+async function saveAtt(){
+  const cid=gi('attClass').value,date=gi('attDate').value;
+  const rows=Object.entries(attData).map(function(e){return{student_id:parseInt(e[0]),class_id:parseInt(cid),attendance_date:date,status:e[1],created_by:currentUser.id,session_id:currentUser.is_test_user?sessionId():null};});
+  const sids=Object.keys(attData).map(Number);
+  for(const sid of sids){await sb.from('attendance').delete().eq('student_id',sid).eq('attendance_date',date);}
+  const{error}=await sb.from('attendance').insert(rows);
+  sh('attAlert',error?'<div class="alert alert-error">'+error.message+'</div>':'<div class="alert alert-success">Yoklama kaydedildi!</div>');
+}
+async function loadLate(){
+  const cid=gi('lateClass').value,date=gi('lateDate').value;
+  if(!cid)return;
+  const{data:abs}=await sb.from('attendance').select('*, students(full_name, student_number)').eq('class_id',cid).eq('attendance_date',date).eq('status','absent');
+  if(!abs||!abs.length){gi('lateList').innerHTML='<div class="alert alert-info" style="margin-top:12px">Gelmedi kaydi yok</div>';return;}
+  let h='<div style="margin-top:16px">';
+  abs.forEach(function(a){h+='<div class="student-row"><div><span class="name">'+(a.students?a.students.full_name:'')+'</span><span class="number">'+(a.students?a.students.student_number:'')+'</span></div><div class="status-btns"><button class="status-btn" onclick="markLate('+a.id+',this)">Gec Geldi</button></div></div>';});
+  h+='</div>';gi('lateList').innerHTML=h;
+}
+async function markLate(id,btn){
+  const t=prompt('Gelis saati (or: 09:30)');if(!t)return;
+  await sb.from('attendance').update({status:'late',late_time:t}).eq('id',id);
+  btn.className='status-btn late';btn.textContent='Gec ('+t+')';btn.disabled=true;
+}
+async function genAttReport(){
+  const sid=gi('arSt').value,from=gi('arFrom').value,to=gi('arTo').value;
+  const rc=gi('arResult');rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+  let q=sb.from('attendance').select('*, students(full_name,student_number), classes(class_name)');
+  if(sid)q=q.eq('student_id',sid);
+  if(from)q=q.gte('attendance_date',from);
+  if(to)q=q.lte('attendance_date',to);
+  const{data}=await q.order('attendance_date',{ascending:false});
+  if(!data||!data.length){rc.innerHTML='<div class="alert alert-info" style="margin-top:16px">Kayit yok</div>';return;}
+  const g={};
+  data.forEach(function(r){const k=r.student_id;if(!g[k])g[k]={name:r.students?r.students.full_name:'',num:r.students?r.students.student_number:'',cls:r.classes?r.classes.class_name:'',recs:[]};g[k].recs.push(r);});
+  let h='<div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Yoklama Raporu</div><div class="table-wrap"><table><thead><tr><th>Ogrenci</th><th>Sinif</th><th>Geldi</th><th>Gelmedi</th><th>Gec</th><th>%</th></tr></thead><tbody>';
+  Object.values(g).forEach(function(v){const t=v.recs.length,a=v.recs.filter(function(r){return r.status==='absent';}).length,l=v.recs.filter(function(r){return r.status==='late';}).length,p=t-a-l;h+='<tr><td>'+v.name+' ('+v.num+')</td><td>'+(v.cls||'-')+'</td><td style="color:var(--green)">'+p+'</td><td style="color:var(--red)">'+a+'</td><td style="color:var(--orange)">'+l+'</td><td>'+(t?Math.round(a/t*100):0)+'%</td></tr>';});
+  h+='</tbody></table></div></div>';rc.innerHTML=h;
+}
 async function downloadAttCSV(){
-const classId=$('csvClass').value,from=$('csvFrom').value,to=$('csvTo').value;
-if(!from||!to)return html('csvAlert','<div class="alert alert-error">Tarih aralığı seçin</div>');
-html('csvAlert','<div class="loading-overlay"><div class="spinner"></div> Veriler hazırlanıyor…</div>');
-let q=sb.from('attendance').select('*, students(full_name,student_number), classes(class_name)');
-if(classId)q=q.eq('class_id',classId);
-q=q.gte('attendance_date',from).lte('attendance_date',to);
-const{data,error}=await q.order('attendance_date').order('student_id');
-if(error)return html('csvAlert','<div class="alert alert-error">'+error.message+'</div>');
-if(!data?.length)return html('csvAlert','<div class="alert alert-info">Bu tarih aralığında yoklama kaydı bulunamadı</div>');
-const statusTR={present:'Geldi',absent:'Gelmedi',late:'Geç Kaldı'};
-let csv='\uFEFF"Tarih","Öğrenci No","Öğrenci Adı","Sınıf","Durum","Geç Kalma Saati"\n';
-data.forEach(r=>{csv+='"'+r.attendance_date+'","'+r.students.student_number+'","'+r.students.full_name+'","'+(r.classes?.class_name||'-')+'","'+(statusTR[r.status]||r.status)+'","'+(r.late_time||'-')+'"\n'});
-const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-const url=URL.createObjectURL(blob);
-const a=document.createElement('a');
-a.href=url;a.download='yoklama_'+from+'_'+to+'.csv';
-document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-html('csvAlert','<div class="alert alert-success">'+data.length+' kayıt indirildi!</div>');
+  const classId=gi('csvClass').value,from=gi('csvFrom').value,to=gi('csvTo').value;
+  if(!from||!to)return sh('csvAlert','<div class="alert alert-error">Tarih araligi secin</div>');
+  sh('csvAlert','<div class="loading-overlay"><div class="spinner"></div> Veriler hazirlaniyor...</div>');
+  let q=sb.from('attendance').select('*, students(full_name,student_number), classes(class_name)');
+  if(classId)q=q.eq('class_id',classId);
+  q=q.gte('attendance_date',from).lte('attendance_date',to);
+  const{data,error}=await q.order('attendance_date').order('student_id');
+  if(error)return sh('csvAlert','<div class="alert alert-error">'+error.message+'</div>');
+  if(!data||!data.length)return sh('csvAlert','<div class="alert alert-info">Bu tarih araliginda yoklama kaydi bulunamadi</div>');
+  const statusTR={present:'Geldi',absent:'Gelmedi',late:'Gec Kaldi'};
+  let csv='\uFEFF"Tarih","No","Ogrenci","Sinif","Durum","Gec Kalma"\n';
+  data.forEach(function(r){csv+='"'+r.attendance_date+'","'+(r.students?r.students.student_number:'')+'","'+(r.students?r.students.full_name:'')+'","'+(r.classes?r.classes.class_name||'-':'-')+'","'+(statusTR[r.status]||r.status)+'","'+(r.late_time||'-')+'"\n';});
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='yoklama_'+from+'_'+to+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  sh('csvAlert','<div class="alert alert-success">'+data.length+' kayit indirildi!</div>');
 }
 
 // ===== TEACHERS =====
 let curSchedTid=null;
-function initTeacherPage(){const nav=$('teacherNav');let b='';if(isAdmin()){b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'list\')">Öğretmenler</button><button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'add\')">Ekle</button><button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'schedule\')">Program</button>'}if(canSubstitute())b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'substitute\')">Vekil Atama</button>';b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'report\')">Rapor</button>';nav.innerHTML=b;showTeacherTab(isAdmin()?'list':canSubstitute()?'substitute':'report')}
-
+function initTeacherPage(){
+  const nav=gi('teacherNav');let b='';
+  if(isAdmin()){b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'list\')">Ogretmenler</button><button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'add\')">Ekle</button><button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'schedule\')">Program</button>';}
+  if(canSubstitute())b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'substitute\')">Vekil Atama</button>';
+  b+='<button class="btn btn-secondary btn-sm" onclick="showTeacherTab(\'report\')">Rapor</button>';
+  nav.innerHTML=b;
+  showTeacherTab(isAdmin()?'list':canSubstitute()?'substitute':'report');
+}
 async function showTeacherTab(tab){
-const c=$('teacher-content');
-if(tab==='list'){
-const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-let h='<div class="card"><div class="card-header"><span class="card-title">Öğretmenler</span></div><div class="table-wrap"><table><thead><tr><th>Ad Soyad</th><th>Branş</th><th>Email</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';
-(teachers||[]).forEach(t=>{h+='<tr><td>'+t.full_name+'</td><td>'+t.branch+'</td><td>'+(t.email||'-')+'</td>';if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editTeacherModal('+t.id+',\''+esc(t.full_name)+'\',\''+esc(t.branch)+'\',\''+esc(t.email||'')+'\')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteTeacher('+t.id+',\''+esc(t.full_name)+'\')">Sil</button></td>';h+='</tr>'});
-h+='</tbody></table></div></div>';c.innerHTML=h;
-} else if(tab==='add'){
-c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Öğretmen Ekle</div><div id="addTeacherAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="tName" class="form-input"></div><div class="form-group"><label>Branş</label><input id="tBranch" class="form-input"></div><div class="form-group"><label>Email</label><input id="tEmail" class="form-input" type="email"></div><button class="btn btn-primary" onclick="addTeacher()">Ekle</button></div>';
-} else if(tab==='schedule'){
-const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-let o=(teachers||[]).map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');
-c.innerHTML='<div class="card"><div class="card-header"><span class="card-title">Haftalık Ders Programı</span>'+(isAdmin()?'<button class="btn btn-sm btn-primary" onclick="addLessonModal()">+ Ders Ekle</button>':'')+'</div><div class="form-group"><label>Öğretmen</label><select id="schedTeacher" class="form-input" onchange="loadSched()"><option value="">Seçin</option>'+o+'</select></div><div id="schedGrid"></div></div>';
-} else if(tab==='substitute'){
-const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-let o=(teachers||[]).map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');
-c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Vekil Öğretmen Atama</div><div id="subAlert"></div><div class="form-group"><label>Gelmeyen Öğretmen</label><select id="subAbsent" class="form-input" onchange="loadAbsSched()"><option value="">Seçin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="subDate" type="date" class="form-input" value="'+today()+'" onchange="loadAbsSched()"></div><div id="subSchedule"></div></div><div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Geçmiş Atamalar</div><div id="subHistory"></div></div>';loadSubHist();
-} else if(tab==='report'){
-c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
-const{data:subs}=await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('substitution_date',{ascending:false});
-const am={},sm={};(subs||[]).forEach(s=>{am[s.absent?.full_name]=(am[s.absent?.full_name]||0)+1;sm[s.sub?.full_name]=(sm[s.sub?.full_name]||0)+1});
-const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
-let h='<div class="card"><div class="card-title" style="margin-bottom:16px">Rapor</div><div class="stats-row"><div class="stat-card"><div class="val">'+(subs?.length||0)+'</div><div class="label">Toplam Vekil</div></div></div><div class="table-wrap"><table><thead><tr><th>Öğretmen</th><th>Gelmediği</th><th>Vekil Olduğu</th></tr></thead><tbody>';
-(teachers||[]).forEach(t=>{h+='<tr><td>'+t.full_name+'</td><td style="color:var(--red)">'+(am[t.full_name]||0)+'</td><td style="color:var(--green)">'+(sm[t.full_name]||0)+'</td></tr>'});
-h+='</tbody></table></div></div>';c.innerHTML=h;
+  const c=gi('teacher-content');
+  if(tab==='list'){
+    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+    let h='<div class="card"><div class="card-header"><span class="card-title">Ogretmenler</span></div><div class="table-wrap"><table><thead><tr><th>Ad Soyad</th><th>Brans</th><th>Email</th>'+(isAdmin()?'<th>Islem</th>':'')+'</tr></thead><tbody>';
+    (teachers||[]).forEach(function(t){h+='<tr><td>'+t.full_name+'</td><td>'+t.branch+'</td><td>'+(t.email||'-')+'</td>';if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editTeacherModal('+t.id+',\''+esc(t.full_name)+'\',\''+esc(t.branch)+'\',\''+esc(t.email||'')+'\')">Duzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteTeacher('+t.id+',\''+esc(t.full_name)+'\')">Sil</button></td>';h+='</tr>';});
+    h+='</tbody></table></div></div>';c.innerHTML=h;
+  } else if(tab==='add'){
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Ogretmen Ekle</div><div id="addTeacherAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="tName" class="form-input"></div><div class="form-group"><label>Brans</label><input id="tBranch" class="form-input"></div><div class="form-group"><label>Email</label><input id="tEmail" class="form-input" type="email"></div><button class="btn btn-primary" onclick="addTeacher()">Ekle</button></div>';
+  } else if(tab==='schedule'){
+    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+    let o=(teachers||[]).map(function(t){return '<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-header"><span class="card-title">Haftalik Ders Programi</span>'+(isAdmin()?'<button class="btn btn-sm btn-primary" onclick="addLessonModal()">+ Ders Ekle</button>':'')+'</div><div class="form-group"><label>Ogretmen</label><select id="schedTeacher" class="form-input" onchange="loadSched()"><option value="">Secin</option>'+o+'</select></div><div id="schedGrid"></div></div>';
+  } else if(tab==='substitute'){
+    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+    let o=(teachers||[]).map(function(t){return '<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>';}).join('');
+    c.innerHTML='<div class="card"><div class="card-title" style="margin-bottom:16px">Vekil Ogretmen Atama</div><div id="subAlert"></div><div class="form-group"><label>Gelmeyen Ogretmen</label><select id="subAbsent" class="form-input" onchange="loadAbsSched()"><option value="">Secin</option>'+o+'</select></div><div class="form-group"><label>Tarih</label><input id="subDate" type="date" class="form-input" value="'+today()+'" onchange="loadAbsSched()"></div><div id="subSchedule"></div></div><div class="card" style="margin-top:16px"><div class="card-title" style="margin-bottom:16px">Gecmis Atamalar</div><div id="subHistory"></div></div>';
+    loadSubHist();
+  } else if(tab==='report'){
+    c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+    const{data:subs}=await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('substitution_date',{ascending:false});
+    const am={},sm={};
+    (subs||[]).forEach(function(s){am[s.absent?s.absent.full_name:'']=(am[s.absent?s.absent.full_name:'']||0)+1;sm[s.sub?s.sub.full_name:'']=(sm[s.sub?s.sub.full_name:'']||0)+1;});
+    const{data:teachers}=await sb.from('teachers').select('*').order('full_name');
+    let h='<div class="card"><div class="card-title" style="margin-bottom:16px">Rapor</div><div class="stats-row"><div class="stat-card"><div class="val">'+((subs||[]).length)+'</div><div class="label">Toplam Vekil</div></div></div>';
+    h+='<div class="table-wrap"><table><thead><tr><th>Ogretmen</th><th>Gelmedigi</th><th>Vekil Oldugu</th></tr></thead><tbody>';
+    (teachers||[]).forEach(function(t){h+='<tr><td>'+t.full_name+'</td><td style="color:var(--red)">'+(am[t.full_name]||0)+'</td><td style="color:var(--green)">'+(sm[t.full_name]||0)+'</td></tr>';});
+    h+='</tbody></table></div></div>';c.innerHTML=h;
+  }
 }
+async function addTeacher(){
+  const n=gi('tName').value.trim(),b=gi('tBranch').value.trim(),e=gi('tEmail').value.trim();
+  if(!n||!b)return sh('addTeacherAlert','<div class="alert alert-error">Ad ve brans gerekli</div>');
+  const{error}=await sb.from('teachers').insert({full_name:n,branch:b,email:e||null});
+  if(error)return sh('addTeacherAlert','<div class="alert alert-error">'+error.message+'</div>');
+  sh('addTeacherAlert','<div class="alert alert-success">Eklendi!</div>');gi('tName').value='';gi('tBranch').value='';gi('tEmail').value='';
 }
-async function addTeacher(){const n=$('tName').value.trim(),b=$('tBranch').value.trim(),e=$('tEmail').value.trim();if(!n||!b)return html('addTeacherAlert','<div class="alert alert-error">Ad ve branş gerekli</div>');const{error}=await sb.from('teachers').insert({full_name:n,branch:b,email:e||null});if(error)return html('addTeacherAlert','<div class="alert alert-error">'+error.message+'</div>');html('addTeacherAlert','<div class="alert alert-success">Eklendi!</div>');$('tName').value='';$('tBranch').value='';$('tEmail').value=''}
-function editTeacherModal(id,name,branch,email){showModal('<h3>Öğretmen Düzenle</h3><div id="etAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="etName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Branş</label><input id="etBranch" class="form-input" value="'+branch+'"></div><div class="form-group"><label>Email</label><input id="etEmail" class="form-input" value="'+email+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateTeacher('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function updateTeacher(id){const n=$('etName').value.trim(),b=$('etBranch').value.trim(),e=$('etEmail').value.trim();if(!n||!b)return html('etAlert','<div class="alert alert-error">Ad ve branş gerekli</div>');await sb.from('teachers').update({full_name:n,branch:b,email:e||null}).eq('id',id);closeModal();showTeacherTab('list')}
-async function deleteTeacher(id,name){if(!confirm('"'+name+'" ve tüm programı silinecek. Emin misiniz?'))return;await sb.from('teacher_schedule').delete().eq('teacher_id',id);await sb.from('substitutions').delete().eq('absent_teacher_id',id);await sb.from('substitutions').delete().eq('substitute_teacher_id',id);await sb.from('teachers').delete().eq('id',id);showTeacherTab('list')}
+function editTeacherModal(id,name,branch,email){
+  showModal('<h3>Ogretmen Duzenle</h3><div id="etAlert"></div><div class="form-group"><label>Ad Soyad</label><input id="etName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Brans</label><input id="etBranch" class="form-input" value="'+branch+'"></div><div class="form-group"><label>Email</label><input id="etEmail" class="form-input" value="'+email+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateTeacher('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+}
+async function updateTeacher(id){
+  const n=gi('etName').value.trim(),b=gi('etBranch').value.trim(),e=gi('etEmail').value.trim();
+  if(!n||!b)return sh('etAlert','<div class="alert alert-error">Ad ve brans gerekli</div>');
+  await sb.from('teachers').update({full_name:n,branch:b,email:e||null}).eq('id',id);closeModal();showTeacherTab('list');
+}
+async function deleteTeacher(id,name){
+  if(!confirm('"'+name+'" ve tum programi silinecek. Emin misiniz?'))return;
+  await sb.from('teacher_schedule').delete().eq('teacher_id',id);
+  await sb.from('substitutions').delete().eq('absent_teacher_id',id);
+  await sb.from('substitutions').delete().eq('substitute_teacher_id',id);
+  await sb.from('teachers').delete().eq('id',id);showTeacherTab('list');
+}
+async function loadSched(){
+  const tid=gi('schedTeacher').value;if(!tid)return;curSchedTid=tid;
+  const{data:sched}=await sb.from('teacher_schedule').select('*').eq('teacher_id',tid);
+  const{data:cfg}=await sb.from('schedule_config').select('*').order('period_number');
+  const days=['Pazartesi','Sali','Carsamba','Persembe','Cuma'];
+  let h='<div class="schedule-grid"><div class="schedule-cell header">Saat</div>';
+  days.forEach(function(d){h+='<div class="schedule-cell header">'+d.substring(0,3)+'</div>';});
+  (cfg||[]).forEach(function(p){
+    h+='<div class="schedule-cell period">'+p.period_number+'. Ders<br><span style="font-size:10px">'+p.start_time.substring(0,5)+'</span></div>';
+    days.forEach(function(d){
+      const ls=(sched||[]).find(function(s){return s.day_of_week===d&&s.period_number===p.period_number;});
+      if(ls){
+        h+='<div class="schedule-cell occupied'+(isAdmin()?' editable':'')+'" onclick="'+(isAdmin()?'editLesson('+ls.id+',\''+d+'\','+p.period_number+',\''+ls.class_info+'\',\''+(ls.subject||'')+'\')':'')+'">'+ls.class_info;
+        if(isAdmin())h+='<span class="del-x" onclick="event.stopPropagation();delLesson('+ls.id+')">x</span>';
+        h+='</div>';
+      } else {
+        h+='<div class="schedule-cell empty'+(isAdmin()?' editable':'')+'" onclick="'+(isAdmin()?'quickAdd(\''+d+'\','+p.period_number+')':'')+'">'+( isAdmin()?'+':'\u2014')+'</div>';
+      }
+    });
+  });
+  h+='</div>';gi('schedGrid').innerHTML=h;
+}
+function addLessonModal(){
+  if(!curSchedTid)return alert('Once ogretmen secin');
+  showModal('<h3>Ders Ekle</h3><div id="alAlert"></div><div class="form-group"><label>Gun</label><select id="alDay" class="form-input"><option>Pazartesi</option><option>Sali</option><option>Carsamba</option><option>Persembe</option><option>Cuma</option></select></div><div class="form-group"><label>Ders Saati</label><input id="alPer" type="number" class="form-input" min="1" max="9"></div><div class="form-group"><label>Sinif</label><input id="alCls" class="form-input" placeholder="A, B, C-D..."></div><div class="form-group"><label>Ders Adi</label><input id="alSub" class="form-input"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveLesson()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+}
+function quickAdd(day,per){
+  showModal('<h3>Ders Ekle \u2014 '+day+' '+per+'. Ders</h3><div id="alAlert"></div><div class="form-group"><label>Sinif</label><input id="alCls" class="form-input" placeholder="A, B, C-D..."></div><div class="form-group"><label>Ders Adi</label><input id="alSub" class="form-input"></div><input type="hidden" id="alDay" value="'+day+'"><input type="hidden" id="alPer" value="'+per+'"><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveLesson()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+}
+async function saveLesson(){
+  const day=gi('alDay').value,per=parseInt(gi('alPer').value),cls=gi('alCls').value.trim(),sub=gi('alSub').value.trim();
+  if(!day||!per||!cls)return sh('alAlert','<div class="alert alert-error">Gun, saat ve sinif gerekli</div>');
+  const{error}=await sb.from('teacher_schedule').upsert({teacher_id:parseInt(curSchedTid),day_of_week:day,period_number:per,class_info:cls,subject:sub||null},{onConflict:'teacher_id,day_of_week,period_number'});
+  if(error)return sh('alAlert','<div class="alert alert-error">'+error.message+'</div>');
+  closeModal();loadSched();
+}
+function editLesson(id,day,per,cls,sub){
+  showModal('<h3>Duzenle \u2014 '+day+' '+per+'. Ders</h3><div id="elAlert"></div><div class="form-group"><label>Sinif</label><input id="elCls" class="form-input" value="'+cls+'"></div><div class="form-group"><label>Ders Adi</label><input id="elSub" class="form-input" value="'+sub+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updLesson('+id+')">Kaydet</button><button class="btn btn-danger" onclick="delLesson('+id+');closeModal()">Sil</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+}
+async function updLesson(id){
+  const cls=gi('elCls').value.trim(),sub=gi('elSub').value.trim();
+  if(!cls)return sh('elAlert','<div class="alert alert-error">Sinif gerekli</div>');
+  await sb.from('teacher_schedule').update({class_info:cls,subject:sub||null}).eq('id',id);closeModal();loadSched();
+}
+async function delLesson(id){
+  if(!confirm('Bu ders silinecek?'))return;
+  await sb.from('teacher_schedule').delete().eq('id',id);loadSched();
+}
 
-// Schedule
-async function loadSched(){const tid=$('schedTeacher').value;if(!tid)return;curSchedTid=tid;const{data:sched}=await sb.from('teacher_schedule').select('*').eq('teacher_id',tid);const{data:cfg}=await sb.from('schedule_config').select('*').order('period_number');const days=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'];let h='<div class="schedule-grid"><div class="schedule-cell header">Saat</div>';days.forEach(d=>{h+='<div class="schedule-cell header">'+d.substring(0,3)+'</div>'});(cfg||[]).forEach(p=>{h+='<div class="schedule-cell period">'+p.period_number+'. Ders<br><span style="font-size:10px">'+p.start_time?.substring(0,5)+'</span></div>';days.forEach(d=>{const ls=(sched||[]).find(s=>s.day_of_week===d&&s.period_number===p.period_number);if(ls){h+='<div class="schedule-cell occupied'+(isAdmin()?' editable':'')+'" onclick="'+(isAdmin()?'editLesson('+ls.id+',\''+d+'\','+p.period_number+',\''+ls.class_info+'\',\''+(ls.subject||'')+'\')':'')+'">'+ls.class_info;if(isAdmin())h+='<span class="del-x" onclick="event.stopPropagation();delLesson('+ls.id+')">✕</span>';h+='</div>'}else{h+='<div class="schedule-cell empty'+(isAdmin()?' editable':'')+'" onclick="'+(isAdmin()?'quickAdd(\''+d+'\','+p.period_number+')':'')+'">'+( isAdmin()?'+':'—')+'</div>'}})});h+='</div>';$('schedGrid').innerHTML=h}
-function addLessonModal(){if(!curSchedTid)return alert('Önce öğretmen seçin');showModal('<h3>Ders Ekle</h3><div id="alAlert"></div><div class="form-group"><label>Gün</label><select id="alDay" class="form-input"><option>Pazartesi</option><option>Salı</option><option>Çarşamba</option><option>Perşembe</option><option>Cuma</option></select></div><div class="form-group"><label>Ders Saati</label><input id="alPer" type="number" class="form-input" min="1" max="9"></div><div class="form-group"><label>Sınıf</label><input id="alCls" class="form-input" placeholder="A, B, C-D..."></div><div class="form-group"><label>Ders Adı</label><input id="alSub" class="form-input"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveLesson()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-function quickAdd(day,per){showModal('<h3>Ders Ekle — '+day+' '+per+'. Ders</h3><div id="alAlert"></div><div class="form-group"><label>Sınıf</label><input id="alCls" class="form-input" placeholder="A, B, C-D..."></div><div class="form-group"><label>Ders Adı</label><input id="alSub" class="form-input"></div><input type="hidden" id="alDay" value="'+day+'"><input type="hidden" id="alPer" value="'+per+'"><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveLesson()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function saveLesson(){const day=$('alDay').value,per=parseInt($('alPer').value),cls=$('alCls').value.trim(),sub=$('alSub').value.trim();if(!day||!per||!cls)return html('alAlert','<div class="alert alert-error">Gün, saat ve sınıf gerekli</div>');const{error}=await sb.from('teacher_schedule').upsert({teacher_id:parseInt(curSchedTid),day_of_week:day,period_number:per,class_info:cls,subject:sub||null},{onConflict:'teacher_id,day_of_week,period_number'});if(error)return html('alAlert','<div class="alert alert-error">'+error.message+'</div>');closeModal();loadSched()}
-function editLesson(id,day,per,cls,sub){showModal('<h3>Düzenle — '+day+' '+per+'. Ders</h3><div id="elAlert"></div><div class="form-group"><label>Sınıf</label><input id="elCls" class="form-input" value="'+cls+'"></div><div class="form-group"><label>Ders Adı</label><input id="elSub" class="form-input" value="'+sub+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updLesson('+id+')">Kaydet</button><button class="btn btn-danger" onclick="delLesson('+id+');closeModal()">Sil</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function updLesson(id){const cls=$('elCls').value.trim(),sub=$('elSub').value.trim();if(!cls)return html('elAlert','<div class="alert alert-error">Sınıf gerekli</div>');await sb.from('teacher_schedule').update({class_info:cls,subject:sub||null}).eq('id',id);closeModal();loadSched()}
-async function delLesson(id){if(!confirm('Bu ders silinecek?'))return;await sb.from('teacher_schedule').delete().eq('id',id);loadSched()}
-
-// Substitute
-async function loadAbsSched(){const tid=$('subAbsent').value,date=$('subDate').value;if(!tid||!date)return;const dn=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][new Date(date).getDay()];if(dn==='Pazar'||dn==='Cumartesi'){$('subSchedule').innerHTML='<div class="alert alert-info" style="margin-top:12px">Hafta sonu seçtiniz</div>';return}const{data:sched}=await sb.from('teacher_schedule').select('*').eq('teacher_id',tid).eq('day_of_week',dn);if(!sched?.length){$('subSchedule').innerHTML='<div class="alert alert-info" style="margin-top:12px">Bu günde dersi yok</div>';return}const{data:allSch}=await sb.from('teacher_schedule').select('*').eq('day_of_week',dn);const{data:existingSubs}=await sb.from('substitutions').select('*').eq('substitution_date',date);const{data:cfg}=await sb.from('schedule_config').select('*').order('period_number');const{data:allT}=await sb.from('teachers').select('*').order('full_name');let h='<div style="margin-top:16px"><div class="alert alert-info">'+dn+' günü — '+sched.length+' ders için vekil atanacak</div>';for(const ls of sched){const pi=cfg?.find(c=>c.period_number===ls.period_number);const busyBySchedule=(allSch||[]).filter(s=>s.period_number===ls.period_number).map(s=>s.teacher_id);const busyBySub=(existingSubs||[]).filter(s=>s.period_number===ls.period_number).map(s=>s.substitute_teacher_id);const alreadyAssigned=(existingSubs||[]).find(s=>s.period_number===ls.period_number&&s.absent_teacher_id===parseInt(tid));const allBusy=[…new Set([…busyBySchedule,…busyBySub])];const avail=(allT||[]).filter(t=>t.id!==parseInt(tid)&&!allBusy.includes(t.id));let ao=avail.map(t=>'<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>').join('');if(alreadyAssigned){const subName=(allT||[]).find(t=>t.id===alreadyAssigned.substitute_teacher_id)?.full_name||'?';h+='<div class="student-row" style="background:rgba(52,199,89,.06)"><div><span class="name">'+ls.period_number+'. Ders</span><span class="number">'+(pi?.start_time?.substring(0,5)||'')+' — Sınıf: '+ls.class_info+'</span></div><div style="display:flex;gap:6px;align-items:center"><span style="color:var(--green);font-size:13px;font-weight:500">✓ '+subName+'</span><button class="btn btn-xs btn-danger" onclick="cancelSub('+alreadyAssigned.id+')">İptal</button></div></div>'}else if(avail.length===0){h+='<div class="student-row" style="background:rgba(255,59,48,.06)"><div><span class="name">'+ls.period_number+'. Ders</span><span class="number">'+(pi?.start_time?.substring(0,5)||'')+' — Sınıf: '+ls.class_info+'</span></div><div style="color:var(--red);font-size:13px">Uygun öğretmen yok</div></div>'}else{h+='<div class="student-row"><div><span class="name">'+ls.period_number+'. Ders</span><span class="number">'+(pi?.start_time?.substring(0,5)||'')+' — Sınıf: '+ls.class_info+'</span></div><div style="display:flex;gap:6px;align-items:center"><select id="sub-sel-'+ls.period_number+'" class="form-input" style="width:auto;padding:6px 10px;font-size:13px"><option value="">'+avail.length+' uygun öğretmen</option>'+ao+'</select><button class="btn btn-sm btn-primary" onclick="assignSub('+tid+',\''+date+'\','+ls.period_number+',\''+ls.class_info+'\')">Ata</button></div></div>'}}h+='</div>';$('subSchedule').innerHTML=h}
-async function cancelSub(id){if(!confirm('Bu vekil ataması iptal edilsin mi?'))return;await sb.from('substitutions').delete().eq('id',id);html('subAlert','<div class="alert alert-success">Atama iptal edildi</div>');loadAbsSched();loadSubHist()}
-async function assignSub(aid,date,per,cls){const sid=$('sub-sel-'+per).value;if(!sid)return alert('Vekil seçin');const{error}=await sb.from('substitutions').upsert({absent_teacher_id:aid,substitute_teacher_id:parseInt(sid),substitution_date:date,period_number:per,class_info:cls,assigned_by:currentUser.id,session_id:currentUser.is_test_user?sessionId():null},{onConflict:'absent_teacher_id,substitution_date,period_number'});if(error)return html('subAlert','<div class="alert alert-error">'+error.message+'</div>');html('subAlert','<div class="alert alert-success">Vekil atandı!</div>');loadAbsSched();loadSubHist()}
-async function loadSubHist(){const{data}=await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('created_at',{ascending:false}).limit(20);if(!data?.length){$('subHistory').innerHTML='<p style="color:var(--text3);font-size:13px">Henüz atama yok</p>';return}let h='<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Ders</th><th>Gelmeyen</th><th>Vekil</th><th>Sınıf</th></tr></thead><tbody>';data.forEach(s=>{h+='<tr><td>'+s.substitution_date+'</td><td>'+s.period_number+'. Ders</td><td>'+(s.absent?.full_name||'-')+'</td><td>'+(s.sub?.full_name||'-')+'</td><td>'+(s.class_info||'-')+'</td></tr>'});h+='</tbody></table></div>';$('subHistory').innerHTML=h}
+// ===== SUBSTITUTE =====
+async function loadAbsSched(){
+  const tid=gi('subAbsent').value,date=gi('subDate').value;if(!tid||!date)return;
+  const dayNames=['Pazar','Pazartesi','Sali','Carsamba','Persembe','Cuma','Cumartesi'];
+  const dn=dayNames[new Date(date).getDay()];
+  if(dn==='Pazar'||dn==='Cumartesi'){gi('subSchedule').innerHTML='<div class="alert alert-info" style="margin-top:12px">Hafta sonu sectiniz</div>';return;}
+  const{data:sched}=await sb.from('teacher_schedule').select('*').eq('teacher_id',tid).eq('day_of_week',dn);
+  if(!sched||!sched.length){gi('subSchedule').innerHTML='<div class="alert alert-info" style="margin-top:12px">Bu gunde dersi yok</div>';return;}
+  const{data:allSch}=await sb.from('teacher_schedule').select('*').eq('day_of_week',dn);
+  const{data:existingSubs}=await sb.from('substitutions').select('*').eq('substitution_date',date);
+  const{data:cfg}=await sb.from('schedule_config').select('*').order('period_number');
+  const{data:allT}=await sb.from('teachers').select('*').order('full_name');
+  let h='<div style="margin-top:16px"><div class="alert alert-info">'+dn+' gunu \u2014 '+sched.length+' ders icin vekil atanacak</div>';
+  for(const ls of sched){
+    const pi=(cfg||[]).find(function(cc){return cc.period_number===ls.period_number;});
+    const busyBySchedule=(allSch||[]).filter(function(s){return s.period_number===ls.period_number;}).map(function(s){return s.teacher_id;});
+    const busyBySub=(existingSubs||[]).filter(function(s){return s.period_number===ls.period_number;}).map(function(s){return s.substitute_teacher_id;});
+    const alreadyAssigned=(existingSubs||[]).find(function(s){return s.period_number===ls.period_number&&s.absent_teacher_id===parseInt(tid);});
+    const allBusy=[...new Set([...busyBySchedule,...busyBySub])];
+    const avail=(allT||[]).filter(function(t){return t.id!==parseInt(tid)&&!allBusy.includes(t.id);});
+    let ao=avail.map(function(t){return '<option value="'+t.id+'">'+t.full_name+' ('+t.branch+')</option>';}).join('');
+    if(alreadyAssigned){
+      const subName=(allT||[]).find(function(t){return t.id===alreadyAssigned.substitute_teacher_id;});
+      h+='<div class="student-row" style="background:rgba(52,199,89,.06)"><div><span class="name">'+ls.period_number+'. Ders</span><span class="number">'+(pi?pi.start_time.substring(0,5):'')+' \u2014 Sinif: '+ls.class_info+'</span></div><div style="display:flex;gap:6px;align-items:center"><span style="color:var(--green);font-size:13px;font-weight:500">\u2713 '+(subName?subName.full_name:'?')+'</span><button class="btn btn-xs btn-danger" onclick="cancelSub('+alreadyAssigned.id+')">Iptal</button></div></div>';
+    } else if(!avail.length){
+      h+='<div class="student-row" style="background:rgba(255,59,48,.06)"><div><span class="name">'+ls.period_number+'. Ders</span><span class="number">'+(pi?pi.start_time.substring(0,5):'')+' \u2014 Sinif: '+ls.class_info+'</span></div><div style="color:var(--red);font-size:13px">Uygun ogretmen yok</div></div>';
+    } else {
+      h+='<div class="student-row"><div><span class="name">'+ls.period_number+'. Ders</span><span class="number">'+(pi?pi.start_time.substring(0,5):'')+' \u2014 Sinif: '+ls.class_info+'</span></div><div style="display:flex;gap:6px;align-items:center"><select id="sub-sel-'+ls.period_number+'" class="form-input" style="width:auto;padding:6px 10px;font-size:13px"><option value="">'+avail.length+' uygun ogretmen</option>'+ao+'</select><button class="btn btn-sm btn-primary" onclick="assignSub('+tid+',\''+date+'\','+ls.period_number+',\''+ls.class_info+'\')">Ata</button></div></div>';
+    }
+  }
+  h+='</div>';gi('subSchedule').innerHTML=h;
+}
+async function cancelSub(id){
+  if(!confirm('Bu vekil atamasi iptal edilsin mi?'))return;
+  await sb.from('substitutions').delete().eq('id',id);
+  sh('subAlert','<div class="alert alert-success">Atama iptal edildi</div>');loadAbsSched();loadSubHist();
+}
+async function assignSub(aid,date,per,cls){
+  const sid=gi('sub-sel-'+per).value;if(!sid)return alert('Vekil secin');
+  const{error}=await sb.from('substitutions').upsert({absent_teacher_id:aid,substitute_teacher_id:parseInt(sid),substitution_date:date,period_number:per,class_info:cls,assigned_by:currentUser.id,session_id:currentUser.is_test_user?sessionId():null},{onConflict:'absent_teacher_id,substitution_date,period_number'});
+  if(error)return sh('subAlert','<div class="alert alert-error">'+error.message+'</div>');
+  sh('subAlert','<div class="alert alert-success">Vekil atandi!</div>');loadAbsSched();loadSubHist();
+}
+async function loadSubHist(){
+  const{data}=await sb.from('substitutions').select('*, absent:absent_teacher_id(full_name), sub:substitute_teacher_id(full_name)').order('created_at',{ascending:false}).limit(20);
+  if(!data||!data.length){gi('subHistory').innerHTML='<p style="color:var(--text3);font-size:13px">Henuz atama yok</p>';return;}
+  let h='<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Ders</th><th>Gelmeyen</th><th>Vekil</th><th>Sinif</th></tr></thead><tbody>';
+  data.forEach(function(s){h+='<tr><td>'+s.substitution_date+'</td><td>'+s.period_number+'. Ders</td><td>'+(s.absent?s.absent.full_name:'-')+'</td><td>'+(s.sub?s.sub.full_name:'-')+'</td><td>'+(s.class_info||'-')+'</td></tr>';});
+  h+='</tbody></table></div>';gi('subHistory').innerHTML=h;
+}
 
 // ===== ADMIN USERS =====
-async function loadAdminUsers(){if(!isAdmin())return;const c=$('admin-users-content');c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';const{data:users}=await sb.from('users').select('*').order('id');const rn={admin:'Admin',ogretmen:'Öğretmen',idareci:'İdareci',bolum_baskani:'Bölüm Başkanı',ofis_calisani:'Ofis'};let h='<div class="card"><div class="card-header"><span class="card-title">Kullanıcılar</span><button class="btn btn-sm btn-primary" onclick="showAddUserModal()">+ Ekle</button></div><div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Ad Soyad</th><th>Rol</th><th>İşlem</th></tr></thead><tbody>';(users||[]).forEach(u=>{h+='<tr><td>'+u.username+'</td><td>'+u.full_name+'</td><td>'+(rn[u.role]||u.role)+'</td><td><button class="btn btn-xs btn-secondary" onclick="editUserModal('+u.id+',\''+u.username+'\',\''+esc(u.full_name)+'\',\''+u.role+'\',\''+esc(u.email||'')+'\')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteUser('+u.id+',\''+u.username+'\')">Sil</button></td></tr>'});h+='</tbody></table></div></div>';c.innerHTML=h}
-function showAddUserModal(){showModal('<h3>Yeni Kullanıcı</h3><div id="auAlert"></div><div class="form-group"><label>Kullanıcı Adı</label><input id="nuUser" class="form-input"></div><div class="form-group"><label>Şifre</label><input id="nuPass" class="form-input" type="password"></div><div class="form-group"><label>Ad Soyad</label><input id="nuName" class="form-input"></div><div class="form-group"><label>Rol</label><select id="nuRole" class="form-input"><option value="ogretmen">Öğretmen</option><option value="idareci">İdareci</option><option value="bolum_baskani">Bölüm Başkanı</option><option value="ofis_calisani">Ofis</option><option value="admin">Admin</option></select></div><div class="form-group"><label>Email</label><input id="nuEmail" class="form-input" type="email"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="addUser()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function addUser(){const u=$('nuUser').value.trim(),p=$('nuPass').value.trim(),n=$('nuName').value.trim(),r=$('nuRole').value,e=$('nuEmail').value.trim();if(!u||!p||!n)return html('auAlert','<div class="alert alert-error">Tüm alanlar gerekli</div>');if(e&&!e.endsWith('@pirireis.k12.tr'))return html('auAlert','<div class="alert alert-error">Sadece @pirireis.k12.tr uzantılı email adresleri eklenebilir</div>');const{error}=await sb.from('users').insert({username:u,password_hash:p,full_name:n,role:r,email:e||null});if(error)return html('auAlert','<div class="alert alert-error">'+error.message+'</div>');closeModal();loadAdminUsers()}
-function editUserModal(id,user,name,role,email){showModal('<h3>Kullanıcı Düzenle</h3><div id="euAlert"></div><div class="form-group"><label>Kullanıcı Adı</label><input id="euUser" class="form-input" value="'+user+'"></div><div class="form-group"><label>Yeni Şifre (boş=değişmez)</label><input id="euPass" class="form-input" type="password"></div><div class="form-group"><label>Ad Soyad</label><input id="euName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Rol</label><select id="euRole" class="form-input"><option value="ogretmen" '+(role==='ogretmen'?'selected':'')+'>Öğretmen</option><option value="idareci" '+(role==='idareci'?'selected':'')+'>İdareci</option><option value="bolum_baskani" '+(role==='bolum_baskani'?'selected':'')+'>Bölüm Başkanı</option><option value="ofis_calisani" '+(role==='ofis_calisani'?'selected':'')+'>Ofis</option><option value="admin" '+(role==='admin'?'selected':'')+'>Admin</option></select></div><div class="form-group"><label>Email</label><input id="euEmail" class="form-input" value="'+email+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateUser('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function updateUser(id){const u=$('euUser').value.trim(),p=$('euPass').value.trim(),n=$('euName').value.trim(),r=$('euRole').value,e=$('euEmail').value.trim();if(!u||!n)return html('euAlert','<div class="alert alert-error">Kullanıcı adı ve ad gerekli</div>');if(e&&!e.endsWith('@pirireis.k12.tr'))return html('euAlert','<div class="alert alert-error">Sadece @pirireis.k12.tr uzantılı email</div>');const upd={username:u,full_name:n,role:r,email:e||null};if(p)upd.password_hash=p;const{error}=await sb.from('users').update(upd).eq('id',id);if(error)return html('euAlert','<div class="alert alert-error">'+error.message+'</div>');closeModal();loadAdminUsers()}
-async function deleteUser(id,user){if(user==='admin')return alert('Admin silinemez');if(!confirm('"'+user+'" silinecek?'))return;await sb.from('users').delete().eq('id',id);loadAdminUsers()}
+async function loadAdminUsers(){
+  if(!isAdmin())return;
+  const c=gi('admin-users-content');c.innerHTML='<div class="loading-overlay"><div class="spinner"></div></div>';
+  const{data:users}=await sb.from('users').select('*').order('id');
+  const rn={admin:'Admin',ogretmen:'Ogretmen',idareci:'Idareci',bolum_baskani:'Bolum Baskani',ofis_calisani:'Ofis'};
+  let h='<div class="card"><div class="card-header"><span class="card-title">Kullanicilar</span><button class="btn btn-sm btn-primary" onclick="showAddUserModal()">+ Ekle</button></div><div class="table-wrap"><table><thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Rol</th><th>Islem</th></tr></thead><tbody>';
+  (users||[]).forEach(function(u){h+='<tr><td>'+u.username+'</td><td>'+u.full_name+'</td><td>'+(rn[u.role]||u.role)+'</td><td><button class="btn btn-xs btn-secondary" onclick="editUserModal('+u.id+',\''+esc(u.username)+'\',\''+esc(u.full_name)+'\',\''+u.role+'\',\''+esc(u.email||'')+'\')">Duzenle</button> <button class="btn btn-xs btn-danger" onclick="deleteUser('+u.id+',\''+esc(u.username)+'\')">Sil</button></td></tr>';});
+  h+='</tbody></table></div></div>';c.innerHTML=h;
+}
+function showAddUserModal(){
+  showModal('<h3>Yeni Kullanici</h3><div id="auAlert"></div><div class="form-group"><label>Kullanici Adi</label><input id="nuUser" class="form-input"></div><div class="form-group"><label>Sifre</label><input id="nuPass" class="form-input" type="password"></div><div class="form-group"><label>Ad Soyad</label><input id="nuName" class="form-input"></div><div class="form-group"><label>Rol</label><select id="nuRole" class="form-input"><option value="ogretmen">Ogretmen</option><option value="idareci">Idareci</option><option value="bolum_baskani">Bolum Baskani</option><option value="ofis_calisani">Ofis</option><option value="admin">Admin</option></select></div><div class="form-group"><label>Email</label><input id="nuEmail" class="form-input" type="email"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="addUser()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+}
+async function addUser(){
+  const u=gi('nuUser').value.trim(),p=gi('nuPass').value.trim(),n=gi('nuName').value.trim(),r=gi('nuRole').value,e=gi('nuEmail').value.trim();
+  if(!u||!p||!n)return sh('auAlert','<div class="alert alert-error">Tum alanlar gerekli</div>');
+  const{error}=await sb.from('users').insert({username:u,password_hash:p,full_name:n,role:r,email:e||null});
+  if(error)return sh('auAlert','<div class="alert alert-error">'+error.message+'</div>');
+  closeModal();loadAdminUsers();
+}
+function editUserModal(id,user,name,role,email){
+  showModal('<h3>Kullanici Duzenle</h3><div id="euAlert"></div><div class="form-group"><label>Kullanici Adi</label><input id="euUser" class="form-input" value="'+user+'"></div><div class="form-group"><label>Yeni Sifre (bos=degismez)</label><input id="euPass" class="form-input" type="password"></div><div class="form-group"><label>Ad Soyad</label><input id="euName" class="form-input" value="'+name+'"></div><div class="form-group"><label>Rol</label><select id="euRole" class="form-input"><option value="ogretmen" '+(role==='ogretmen'?'selected':'')+'>Ogretmen</option><option value="idareci" '+(role==='idareci'?'selected':'')+'>Idareci</option><option value="bolum_baskani" '+(role==='bolum_baskani'?'selected':'')+'>Bolum Baskani</option><option value="ofis_calisani" '+(role==='ofis_calisani'?'selected':'')+'>Ofis</option><option value="admin" '+(role==='admin'?'selected':'')+'>Admin</option></select></div><div class="form-group"><label>Email</label><input id="euEmail" class="form-input" value="'+email+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updateUser('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
+}
+async function updateUser(id){
+  const u=gi('euUser').value.trim(),p=gi('euPass').value.trim(),n=gi('euName').value.trim(),r=gi('euRole').value,e=gi('euEmail').value.trim();
+  if(!u||!n)return sh('euAlert','<div class="alert alert-error">Kullanici adi ve ad gerekli</div>');
+  const upd={username:u,full_name:n,role:r,email:e||null};if(p)upd.password_hash=p;
+  const{error}=await sb.from('users').update(upd).eq('id',id);
+  if(error)return sh('euAlert','<div class="alert alert-error">'+error.message+'</div>');
+  closeModal();loadAdminUsers();
+}
+async function deleteUser(id,user){
+  if(user==='admin')return alert('Admin silinemez');
+  if(!confirm('"'+user+'" silinecek?'))return;
+  await sb.from('users').delete().eq('id',id);loadAdminUsers();
+}
 
 // ===== SCHEDULE CONFIG =====
-async function loadScheduleConfig(){const c=$('schedule-config-content');const{data:cfg}=await sb.from('schedule_config').select('*').order('period_number');let h='<div class="card"><div class="card-header"><span class="card-title">Ders Saatleri</span>'+(isAdmin()?'<button class="btn btn-sm btn-primary" onclick="addPeriodModal()">+ Ekle</button>':'')+'</div><div class="table-wrap"><table><thead><tr><th>Ders</th><th>Başlangıç</th><th>Bitiş</th>'+(isAdmin()?'<th>İşlem</th>':'')+'</tr></thead><tbody>';(cfg||[]).forEach(c=>{h+='<tr><td>'+c.period_number+'. Ders</td><td>'+c.start_time?.substring(0,5)+'</td><td>'+c.end_time?.substring(0,5)+'</td>';if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editPeriodModal('+c.id+','+c.period_number+',\''+c.start_time?.substring(0,5)+'\',\''+c.end_time?.substring(0,5)+'\')">Düzenle</button> <button class="btn btn-xs btn-danger" onclick="delPeriod('+c.id+')">Sil</button></td>';h+='</tr>'});h+='</tbody></table></div></div>';c.innerHTML=h}
-function addPeriodModal(){showModal('<h3>Ders Saati Ekle</h3><div class="form-group"><label>Ders No</label><input id="pNum" type="number" class="form-input"></div><div class="form-group"><label>Başlangıç</label><input id="pStart" type="time" class="form-input"></div><div class="form-group"><label>Bitiş</label><input id="pEnd" type="time" class="form-input"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="addPeriod()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function addPeriod(){const n=parseInt($('pNum').value),s=$('pStart').value,e=$('pEnd').value;if(!n||!s||!e)return alert('Tüm alanları doldurun');await sb.from('schedule_config').upsert({period_number:n,start_time:s,end_time:e},{onConflict:'period_number'});closeModal();loadScheduleConfig()}
-function editPeriodModal(id,num,start,end){showModal('<h3>'+num+'. Ders Düzenle</h3><div class="form-group"><label>Başlangıç</label><input id="epS" type="time" class="form-input" value="'+start+'"></div><div class="form-group"><label>Bitiş</label><input id="epE" type="time" class="form-input" value="'+end+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updPeriod('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>')}
-async function updPeriod(id){await sb.from('schedule_config').update({start_time:$('epS').value,end_time:$('epE').value}).eq('id',id);closeModal();loadScheduleConfig()}
-async function delPeriod(id){if(!confirm('Silinecek?'))return;await sb.from('schedule_config').delete().eq('id',id);loadScheduleConfig()}
+async function loadScheduleConfig(){
+  const c=gi('schedule-config-content');
+  const{data:cfg}=await sb.from('schedule_config').select('*').order('period_number');
+  let h='<div class="card"><div class="card-header"><span class="card-title">Ders Saatleri</span>'+(isAdmin()?'<button class="btn btn-sm btn-primary" onclick="addPeriodModal()">+ Ekle</button>':'')+'</div><div class="table-wrap"><table><thead><tr><th>Ders</th><th>Baslangic</th><th>Bitis</th>'+(isAdmin()?'<th>Islem</th>':'')+'</tr></thead><tbody>';
+  (cfg||[]).forEach(function(p){
+    h+='<tr><td>'+p.period_number+'. Ders</td><td>'+p.start_time.substring(0,5)+'</td><td>'+p.end_time.substring(0,5)+'</td>';
+    if(isAdmin())h+='<td><button class="btn btn-xs btn-secondary" onclick="editPeriodModal('+p.id+','+p.period_number+',\''+p.start_time.substring(0,5)+'\',\''+p.end_time.substring(0,5)+'\')">Duzenle</button> <button class="btn btn-xs btn-danger" onclick="delPeriod('+p.id+')">Sil</button></td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';c.innerHTML=h;
+}
+function addPeriodModal(){showModal('<h3>Ders Saati Ekle</h3><div class="form-group"><label>Ders No</label><input id="pNum" type="number" class="form-input"></div><div class="form-group"><label>Baslangic</label><input id="pStart" type="time" class="form-input"></div><div class="form-group"><label>Bitis</label><input id="pEnd" type="time" class="form-input"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="addPeriod()">Ekle</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');}
+async function addPeriod(){const n=parseInt(gi('pNum').value),s=gi('pStart').value,e=gi('pEnd').value;if(!n||!s||!e)return alert('Tum alanlari doldurun');await sb.from('schedule_config').upsert({period_number:n,start_time:s,end_time:e},{onConflict:'period_number'});closeModal();loadScheduleConfig();}
+function editPeriodModal(id,num,start,end){showModal('<h3>'+num+'. Ders Duzenle</h3><div class="form-group"><label>Baslangic</label><input id="epS" type="time" class="form-input" value="'+start+'"></div><div class="form-group"><label>Bitis</label><input id="epE" type="time" class="form-input" value="'+end+'"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="updPeriod('+id+')">Kaydet</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');}
+async function updPeriod(id){await sb.from('schedule_config').update({start_time:gi('epS').value,end_time:gi('epE').value}).eq('id',id);closeModal();loadScheduleConfig();}
+async function delPeriod(id){if(!confirm('Silinecek?'))return;await sb.from('schedule_config').delete().eq('id',id);loadScheduleConfig();}
 
-// ===== ÖĞRETMEN GÖRÜŞLERİ =====
+// ===== OPINIONS =====
 async function writeOpinionModal(studentId,studentName,teacherId){
-showModal('<h3>Görüş Yaz — '+studentName+'</h3><div id="opModalAlert"></div><div class="form-group"><label>Görüşünüz (Türkçe veya Fransızca)</label><textarea id="opText" class="form-input" rows="5" placeholder="Öğrenci hakkındaki değerlendirmenizi yazın..."></textarea></div><div class="form-group"><label>Dönem</label><select id="opTerm" class="form-input"><option value="2024-2025 Güz">2024-2025 Güz</option><option value="2024-2025 Bahar" selected>2024-2025 Bahar</option><option value="2025-2026 Güz">2025-2026 Güz</option></select></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveOpinion('+studentId+','+teacherId+')">Kaydet ve Çevir</button><button class="btn btn-secondary" onclick="closeModal()">İptal</button></div>');
+  showModal('<h3>Gorup Yaz \u2014 '+studentName+'</h3><div id="opModalAlert"></div><div class="form-group"><label>Gorusunuz (Turkce veya Fransizca)</label><textarea id="opText" class="form-input" rows="5" placeholder="Ogrenci hakkindaki degerlendirmenizi yazin..."></textarea></div><div class="form-group"><label>Donem</label><select id="opTerm" class="form-input"><option value="2024-2025 Guz">2024-2025 Guz</option><option value="2024-2025 Bahar" selected>2024-2025 Bahar</option><option value="2025-2026 Guz">2025-2026 Guz</option></select></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="saveOpinion('+studentId+','+teacherId+')">Kaydet ve Cevir</button><button class="btn btn-secondary" onclick="closeModal()">Iptal</button></div>');
 }
 async function saveOpinion(studentId,teacherId){
-const text=$('opText').value.trim();
-const term=$('opTerm').value;
-if(!text)return html('opModalAlert','<div class="alert alert-error">Görüş metni gerekli</div>');
-html('opModalAlert','<div class="loading-overlay"><div class="spinner"></div> Çevriliyor...</div>');
-try{
-const isTurkish=/[ğüşıöçĞÜŞİÖÇ]/.test(text)||/^[a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s.,;:!?()-]+$/.test(text);
-const prompt=isTurkish?
-'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz, başka bir şey ekleme:
-
-'+text:
-'Translate the following French teacher opinion to Turkish. Only write the translation, nothing else:
-
-'+text;
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-const translated=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
-const opTr=isTurkish?text:translated;
-const opFr=isTurkish?translated:text;
-const{error}=await sb.from('teacher_opinions').insert({
-student_id:studentId,teacher_id:teacherId,
-opinion_tr:opTr,opinion_fr:opFr,term:term
-});
-if(error)return html('opModalAlert','<div class="alert alert-error">'+error.message+'</div>');
-html('opModalAlert','<div class="alert alert-success">Görüş kaydedildi!<br><strong>TR:</strong> '+opTr.substring(0,100)+'...<br><strong>FR:</strong> '+opFr.substring(0,100)+'...</div>');
-setTimeout(()=>closeModal(),3000);
-}catch(e){html('opModalAlert','<div class="alert alert-error">Çeviri hatası: '+e.message+'</div>')}
+  const text=gi('opText').value.trim();const term=gi('opTerm').value;
+  if(!text)return sh('opModalAlert','<div class="alert alert-error">Gorup metni gerekli</div>');
+  sh('opModalAlert','<div class="loading-overlay"><div class="spinner"></div> Cevriliyor...</div>');
+  try{
+    const isTurkish=/[a-zA-Z\u00C0-\u017F]/.test(text);
+    const isFrench=/[àâäéèêëîïôùûüÿçœæ]/i.test(text);
+    const toLang=isFrench?'Turkce':'Fransizca';
+    const prompt='Su metni '+toLang+'ye cevir, sadece ceviriyi yaz:\n\n'+text;
+    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+    const data=await resp.json();
+    const translated=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0])?data.candidates[0].content.parts[0].text:'';
+    const opTr=isFrench?translated:text;const opFr=isFrench?text:translated;
+    const{error}=await sb.from('teacher_opinions').insert({student_id:studentId,teacher_id:teacherId,opinion_tr:opTr,opinion_fr:opFr,term:term});
+    if(error)return sh('opModalAlert','<div class="alert alert-error">'+error.message+'</div>');
+    sh('opModalAlert','<div class="alert alert-success">Gorup kaydedildi!</div>');
+    setTimeout(closeModal,2500);
+  }catch(e){sh('opModalAlert','<div class="alert alert-error">Ceviri hatasi: '+e.message+'</div>');}
 }
 async function viewPastOpinions(studentId,studentName){
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId).order('created_at',{ascending:false});
-let h='<h3>📜 '+studentName+' — Geçmiş Görüşler</h3>';
-if(!ops?.length){h+='<p style="color:var(--text3);margin-top:12px">Henüz görüş yazılmamış.</p>'}
-else{(ops).forEach(o=>{
-h+='<div style="border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-top:12px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:500;font-size:13px">'+(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+')</span><span style="font-size:11px;color:var(--text3)">'+( o.term||'')+' — '+new Date(o.created_at).toLocaleDateString('tr-TR')+'</span></div>';
-h+='<div style="font-size:13px;margin-bottom:6px"><strong>TR:</strong> '+(o.opinion_tr||'-')+'</div>';
-h+='<div style="font-size:13px;color:var(--text2)"><strong>FR:</strong> '+(o.opinion_fr||'-')+'</div></div>';
-})}
-h+='<div style="margin-top:16px"><button class="btn btn-secondary" onclick="closeModal()">Kapat</button></div>';
-showModal(h);
+  const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId).order('created_at',{ascending:false});
+  let h='<h3>'+studentName+' \u2014 Gecmis Gorusler</h3>';
+  if(!ops||!ops.length){h+='<p style="color:var(--text3);margin-top:12px">Henuz gorup yazilmamis.</p>';}
+  else{ops.forEach(function(o){h+='<div style="border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-top:12px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:500;font-size:13px">'+(o.teachers?o.teachers.full_name:'-')+' ('+(o.teachers?o.teachers.branch:'-')+')</span><span style="font-size:11px;color:var(--text3)">'+(o.term||'')+' \u2014 '+new Date(o.created_at).toLocaleDateString('tr-TR')+'</span></div><div style="font-size:13px;margin-bottom:6px"><strong>TR:</strong> '+(o.opinion_tr||'-')+'</div><div style="font-size:13px;color:var(--text2)"><strong>FR:</strong> '+(o.opinion_fr||'-')+'</div></div>';});}
+  h+='<div style="margin-top:16px"><button class="btn btn-secondary" onclick="closeModal()">Kapat</button></div>';
+  showModal(h);
 }
 async function viewClassOpinions(){
-const cid=$('opClassSel').value;
-if(!cid)return alert('Sınıf seçin');
-const rc=$('opinionResult');
-rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yükleniyor...</div>';
-const{data:students}=await sb.from('students').select('*, classes(class_name)').eq('class_id',cid).order('full_name');
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',(students||[]).map(s=>s.id)).order('created_at',{ascending:false});
-let h='';
-(students||[]).forEach(st=>{
-const stOps=(ops||[]).filter(o=>o.student_id===st.id);
-h+='<div class="card" style="margin-bottom:12px"><div class="card-title">'+st.full_name+' ('+st.student_number+') — '+(st.classes?.class_name||'')+'</div>';
-if(!stOps.length){h+='<p style="color:var(--text3);font-size:13px;margin-top:8px">Görüş yok</p>'}
-else{stOps.forEach(o=>{
-h+='<div style="border-left:3px solid var(--accent);padding:8px 12px;margin-top:8px;font-size:13px"><div style="font-weight:500;margin-bottom:4px">'+(o.teachers?.full_name||'-')+' — '+(o.teachers?.branch||'-')+' <span style="color:var(--text3);font-weight:400">('+( o.term||'')+')</span></div>';
-h+='<div><strong>TR:</strong> '+(o.opinion_tr||'-')+'</div>';
-h+='<div style="color:var(--text2)"><strong>FR:</strong> '+(o.opinion_fr||'-')+'</div></div>';
-})}
-h+='</div>';
-});
-rc.innerHTML=h||'<div class="alert alert-info">Öğrenci bulunamadı</div>';
+  const cid=gi('opClassSel').value;if(!cid)return alert('Sinif secin');
+  const rc=gi('opinionResult');rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Yukleniyor...</div>';
+  const{data:students}=await sb.from('students').select('*, classes(class_name)').eq('class_id',cid).order('full_name');
+  const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',(students||[]).map(function(s){return s.id;})).order('created_at',{ascending:false});
+  let h='';
+  (students||[]).forEach(function(st){
+    const stOps=(ops||[]).filter(function(o){return o.student_id===st.id;});
+    h+='<div class="card" style="margin-bottom:12px"><div class="card-title">'+st.full_name+' ('+st.student_number+') \u2014 '+(st.classes?st.classes.class_name||'':'')+'</div>';
+    if(!stOps.length){h+='<p style="color:var(--text3);font-size:13px;margin-top:8px">Gorup yok</p>';}
+    else{stOps.forEach(function(o){h+='<div style="border-left:3px solid var(--accent);padding:8px 12px;margin-top:8px;font-size:13px"><div style="font-weight:500;margin-bottom:4px">'+(o.teachers?o.teachers.full_name:'-')+' \u2014 '+(o.teachers?o.teachers.branch:'-')+'</div><div><strong>TR:</strong> '+(o.opinion_tr||'-')+'</div><div style="color:var(--text2)"><strong>FR:</strong> '+(o.opinion_fr||'-')+'</div></div>';});}
+    h+='</div>';
+  });
+  rc.innerHTML=h||'<div class="alert alert-info">Ogrenci bulunamadi</div>';
 }
 async function downloadClassOpinions(){
-const cid=$('opClassSel').value;
-if(!cid)return alert('Sınıf seçin');
-const{data:cls}=await sb.from('classes').select('*').eq('id',cid).single();
-const{data:students}=await sb.from('students').select('*, classes(class_name)').eq('class_id',cid).order('full_name');
-const sids=(students||[]).map(s=>s.id);
-if(!sids.length)return alert('Öğrenci bulunamadı');
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',sids).order('student_id').order('created_at',{ascending:false});
-let csv='﻿"Öğrenci","Okul No","Sınıf","Öğretmen","Branş","Dönem","Görüş (TR)","Görüş (FR)","Tarih"
-';
-(students||[]).forEach(st=>{
-const stOps=(ops||[]).filter(o=>o.student_id===st.id);
-if(stOps.length){stOps.forEach(o=>{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","'+(o.teachers?.full_name||'')+'","'+(o.teachers?.branch||'')+'","'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"
-';
-})}else{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","","","","Görüş yok","",""
-';
-}});
-const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-const url=URL.createObjectURL(blob);
-const a=document.createElement('a');
-a.href=url;a.download='gorusler_'+(cls?.class_name||'sinif')+'.csv';
-document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-}
-async function generateGeminiSummary(studentId,studentName){
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId);
-if(!ops?.length)return alert('Bu öğrenci için görüş bulunamadı');
-let context='Öğrenci: '+studentName+'
-
-';
-ops.forEach(o=>{context+='Öğretmen: '+(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+')
-Görüş: '+(o.opinion_tr||o.opinion_fr||'-')+'
-
-'});
-const prompt='Aşağıdaki öğretmen görüşlerini analiz ederek öğrenci hakkında kapsamlı bir özet paragraf yaz. Güçlü yönleri, gelişim alanlarını ve önerileri içersin. Türkçe ve Fransızca olarak ayrı ayrı yaz.
-
-'+context;
-try{
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-return data?.candidates?.[0]?.content?.parts?.[0]?.text||'Özet oluşturulamadı';
-}catch(e){return 'Hata: '+e.message}
+  const cid=gi('opClassSel').value;if(!cid)return alert('Sinif secin');
+  const{data:cls}=await sb.from('classes').select('*').eq('id',cid).single();
+  const{data:students}=await sb.from('students').select('*, classes(class_name)').eq('class_id',cid).order('full_name');
+  const sids=(students||[]).map(function(s){return s.id;});
+  if(!sids.length)return alert('Ogrenci bulunamadi');
+  const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',sids).order('student_id').order('created_at',{ascending:false});
+  let csv='\uFEFF"Ogrenci","Okul No","Sinif","Ogretmen","Brans","Donem","Gorup (TR)","Gorup (FR)","Tarih"\n';
+  (students||[]).forEach(function(st){
+    const stOps=(ops||[]).filter(function(o){return o.student_id===st.id;});
+    if(stOps.length){stOps.forEach(function(o){csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?st.classes.class_name||'':'')+'" ,"'+(o.teachers?o.teachers.full_name||'':'')+'" ,"'+(o.teachers?o.teachers.branch||'':'')+'" ,"'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"\n';});}
+    else{csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?st.classes.class_name||'':'')+' ","","","","Gorup yok","",""\n';}
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='gorusler_'+(cls?cls.class_name||'sinif':'sinif')+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
+// ===== AI ANALYSIS =====
 async function aiStudentAnalysis(sid){
-const rc=document.getElementById('aiAnalysisResult');
-if(!rc)return;
-rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapıyor...</div>';
-try{
-const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();
-const{data:entries}=await sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false}).limit(50);
-const{data:att}=await sb.from('attendance').select('*').eq('student_id',sid);
-const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',sid);
-const tot=att?.length||0,abs=att?.filter(a=>a.status==='absent').length||0,lat=att?.filter(a=>a.status==='late').length||0;
-let context='Öğrenci: '+st.full_name+' ('+( st.classes?.class_name||'')+')\n';
-context+='Devamsızlık: Toplam '+tot+' gün, '+abs+' gelmedi, '+lat+' geç kaldı\n\n';
-if(entries?.length){context+='Veri Kayıtları:\n';entries.forEach(e=>{context+=e.entry_date+' - '+e.data_type+': '+e.description+'\n'});context+='\n'}
-if(ops?.length){context+='Öğretmen Görüşleri:\n';ops.forEach(o=>{context+=(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+'): '+(o.opinion_tr||o.opinion_fr||'-')+'\n'})}
-const prompt='Aşağıdaki öğrenci verilerini analiz et. Türkçe olarak şu başlıklar altında bir rapor oluştur:\n1. Genel Değerlendirme\n2. Güçlü Yönler\n3. Gelişmesi Gereken Yönler\n4. Öneriler\n\n'+context;
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-const analysis=data?.candidates?.[0]?.content?.parts?.[0]?.text||'Analiz oluşturulamadı';
-rc.innerHTML='<div class="card" style="margin-top:16px"><div class="card-title">🤖 Gemini AI Analizi</div><div style="margin-top:12px;white-space:pre-wrap;font-size:14px;line-height:1.6">'+analysis.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div></div>';
-}catch(e){rc.innerHTML='<div class="alert alert-error">AI analiz hatası: '+e.message+'</div>'}
+  const rc=document.getElementById('aiAnalysisResult');if(!rc)return;
+  rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapiyor...</div>';
+  try{
+    const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();
+    const{data:entries}=await sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false}).limit(50);
+    const{data:att}=await sb.from('attendance').select('*').eq('student_id',sid);
+    const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',sid);
+    const tot=(att||[]).length,abs=(att||[]).filter(function(a){return a.status==='absent';}).length,lat=(att||[]).filter(function(a){return a.status==='late';}).length;
+    let context='Ogrenci: '+st.full_name+' ('+(st.classes?st.classes.class_name||'':'')+')\n';
+    context+='Devamsizlik: Toplam '+tot+' gun, '+abs+' gelmedi, '+lat+' gec kaldi\n\n';
+    if((entries||[]).length){context+='Veri Kayitlari:\n';entries.forEach(function(e){context+=e.entry_date+' - '+e.data_type+': '+e.description+'\n';});context+='\n';}
+    if((ops||[]).length){context+='Ogretmen Gorusleri:\n';ops.forEach(function(o){context+=(o.teachers?o.teachers.full_name:'-')+' ('+(o.teachers?o.teachers.branch:'-')+'): '+(o.opinion_tr||o.opinion_fr||'-')+'\n';});}
+    const prompt='Asagidaki ogrenci verilerini analiz et. Turkce olarak su basliklar altinda bir rapor olustur:\n1. Genel Degerlendirme\n2. Guclu Yonler\n3. Gelismesi Gereken Yonler\n4. Oneriler\n\n'+context;
+    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+    const data=await resp.json();
+    const analysis=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0])?data.candidates[0].content.parts[0].text:'Analiz olusturulamadi';
+    rc.innerHTML='<div class="card" style="margin-top:16px"><div class="card-title">Gemini AI Analizi</div><div style="margin-top:12px;white-space:pre-wrap;font-size:14px;line-height:1.6">'+analysis.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div></div>';
+  }catch(e){rc.innerHTML='<div class="alert alert-error">AI analiz hatasi: '+e.message+'</div>';}
 }
-
 
 </script>
-
 </body>
 </html>
