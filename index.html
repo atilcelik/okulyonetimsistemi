@@ -160,6 +160,35 @@ const SUPABASE_URL='https://wrzsdecsembngeitfyxi.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyenNkZWNzZW1ibmdlaXRmeXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTA1MzIsImV4cCI6MjA5MDY4NjUzMn0.WVcmxpmFQ5w53gIUPIg-vWo1Kl09dHyHC_lyOhghi3w';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 const GEMINI_API_KEY='AIzaSyBFqY_7TDc0ejkN5naYTubzgzjZR4UWOEU';
+
+// ===== GEMINI HELPER =====
+async function callGemini(prompt){
+  const url='https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY;
+  const body=JSON.stringify({contents:[{parts:[{text:prompt}]}]});
+  const maxRetries=3;
+  for(let i=0;i<maxRetries;i++){
+    try{
+      const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body});
+      if(resp.status===429){
+        if(i<maxRetries-1){
+          const wait=(i+1)*3000;
+          await new Promise(function(r){setTimeout(r,wait);});
+          continue;
+        }
+        throw new Error('Gemini API istek limiti asimadi (429). Lutfen 1 dakika bekleyip tekrar deneyin.');
+      }
+      if(!resp.ok)throw new Error('Gemini API hatasi: HTTP '+resp.status);
+      const data=await resp.json();
+      const text=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0])?data.candidates[0].content.parts[0].text:'';
+      return text;
+    }catch(e){
+      if(i===maxRetries-1)throw e;
+      await new Promise(function(r){setTimeout(r,2000);});
+    }
+  }
+  throw new Error('Gemini API cevap vermedi');
+}
+
 let currentUser=null;
 
 // ===== SESSION =====
@@ -714,9 +743,7 @@ async function saveOpinion(studentId,teacherId){
     const isFrench=/[àâäéèêëîïôùûüÿçœæ]/i.test(text);
     const toLang=isFrench?'Turkce':'Fransizca';
     const prompt='Su metni '+toLang+'ye cevir, sadece ceviriyi yaz:\n\n'+text;
-    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
-    const data=await resp.json();
-    const translated=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0])?data.candidates[0].content.parts[0].text:'';
+    const translated=await callGemini(prompt)||'';
     const opTr=isFrench?translated:text;const opFr=isFrench?text:translated;
     const{error}=await sb.from('teacher_opinions').insert({student_id:studentId,teacher_id:teacherId,opinion_tr:opTr,opinion_fr:opFr,term:term});
     if(error)return sh('opModalAlert','<div class="alert alert-error">'+error.message+'</div>');
@@ -781,9 +808,7 @@ async function aiStudentAnalysis(sid){
     if((entries||[]).length){context+='Veri Kayitlari:\n';entries.forEach(function(e){context+=e.entry_date+' - '+e.data_type+': '+e.description+'\n';});context+='\n';}
     if((ops||[]).length){context+='Ogretmen Gorusleri:\n';ops.forEach(function(o){context+=(o.teachers?o.teachers.full_name:'-')+' ('+(o.teachers?o.teachers.branch:'-')+'): '+(o.opinion_tr||o.opinion_fr||'-')+'\n';});}
     const prompt='Asagidaki ogrenci verilerini analiz et. Turkce olarak su basliklar altinda bir rapor olustur:\n1. Genel Degerlendirme\n2. Guclu Yonler\n3. Gelismesi Gereken Yonler\n4. Oneriler\n\n'+context;
-    const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_API_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
-    const data=await resp.json();
-    const analysis=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0])?data.candidates[0].content.parts[0].text:'Analiz olusturulamadi';
+    const analysis=await callGemini(prompt)||'Analiz olusturulamadi';
     rc.innerHTML='<div class="card" style="margin-top:16px"><div class="card-title">Gemini AI Analizi</div><div style="margin-top:12px;white-space:pre-wrap;font-size:14px;line-height:1.6">'+analysis.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div></div>';
   }catch(e){rc.innerHTML='<div class="alert alert-error">AI analiz hatasi: '+e.message+'</div>';}
 }
