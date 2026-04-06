@@ -18,12 +18,8 @@ html('opModalAlert','<div class="loading-overlay"><div class="spinner"></div> Ç
 try{
 const isTurkish=/[ğüşıöçĞÜŞİÖÇ]/.test(text)||/^[a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s.,;:!?()-]+$/.test(text);
 const prompt=isTurkish?
-'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz, başka bir şey ekleme:
-
-'+text:
-'Translate the following French teacher opinion to Turkish. Only write the translation, nothing else:
-
-'+text;
+'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz, başka bir şey ekleme:\n\n'+text:
+'Translate the following French teacher opinion to Turkish. Only write the translation, nothing else:\n\n'+text;
 const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY,{
 method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
@@ -82,16 +78,13 @@ const{data:students}=await sb.from('students').select('*, classes(class_name)').
 const sids=(students||[]).map(s=>s.id);
 if(!sids.length)return alert('Öğrenci bulunamadı');
 const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',sids).order('student_id').order('created_at',{ascending:false});
-let csv='﻿"Öğrenci","Okul No","Sınıf","Öğretmen","Branş","Dönem","Görüş (TR)","Görüş (FR)","Tarih"
-';
+let csv='﻿"Öğrenci","Okul No","Sınıf","Öğretmen","Branş","Dönem","Görüş (TR)","Görüş (FR)","Tarih"\n';
 (students||[]).forEach(st=>{
 const stOps=(ops||[]).filter(o=>o.student_id===st.id);
 if(stOps.length){stOps.forEach(o=>{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","'+(o.teachers?.full_name||'')+'","'+(o.teachers?.branch||'')+'","'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"
-';
+csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","'+(o.teachers?.full_name||'')+'","'+(o.teachers?.branch||'')+'","'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"\n';
 })}else{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","","","","Görüş yok","",""
-';
+csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","","","","Görüş yok","",""\n';
 }});
 const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
 const url=URL.createObjectURL(blob);
@@ -102,30 +95,13 @@ document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeOb
 async function generateGeminiSummary(studentId,studentName){
 const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId);
 if(!ops?.length)return alert('Bu öğrenci için görüş bulunamadı');
-let context='Öğrenci: '+studentName+'
-
-';
+let context='Öğrenci: '+studentName+'\n\n';
 ops.forEach(o=>{context+='Öğretmen: '+(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+')
 Görüş: '+(o.opinion_tr||o.opinion_fr||'-')+'
 
-'});
-const prompt='Aşağıdaki öğretmen görüşlerini analiz ederek öğrenci hakkında kapsamlı bir özet paragraf yaz. Güçlü yönleri, gelişim alanlarını ve önerileri içersin. Türkçe ve Fransızca olarak ayrı ayrı yaz.
+'});\nconst prompt='Aşağıdaki öğretmen görüşlerini analiz ederek öğrenci hakkında kapsamlı bir özet paragraf yaz. Güçlü yönleri, gelişim alanlarını ve önerileri içersin. Türkçe ve Fransızca olarak ayrı ayrı yaz.
 
-'+context;
-try{
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-return data?.candidates?.[0]?.content?.parts?.[0]?.text||'Özet oluşturulamadı';
-}catch(e){return 'Hata: '+e.message}
-}
-
-async function aiStudentAnalysis(sid){
-const rc=document.getElementById('aiAnalysisResult');
-if(!rc)return;
-rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapıyor...</div>';
+'+context;\ntry{\nconst resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY,{\nmethod:'POST',headers:{'Content-Type':'application/json'},\nbody:JSON.stringify({contents:[{parts:[{text:prompt}]}]})\n});\nconst data=await resp.json();\nreturn data?.candidates?.[0]?.content?.parts?.[0]?.text||'Özet oluşturulamadı';\n}catch(e){return 'Hata: '+e.message}\n}\n\nasync function aiStudentAnalysis(sid){\nconst rc=document.getElementById('aiAnalysisResult');\nif(!rc)return;\nrc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapıyor...</div>';
 try{
 const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();
 const{data:entries}=await sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false}).limit(50);
@@ -533,12 +509,8 @@ html('opModalAlert','<div class="loading-overlay"><div class="spinner"></div> Ç
 try{
 const isTurkish=/[ğüşıöçĞÜŞİÖÇ]/.test(text)||/^[a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s.,;:!?()-]+$/.test(text);
 const prompt=isTurkish?
-'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz, başka bir şey ekleme:
-
-'+text:
-'Translate the following French teacher opinion to Turkish. Only write the translation, nothing else:
-
-'+text;
+'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz, başka bir şey ekleme:\n\n'+text:
+'Translate the following French teacher opinion to Turkish. Only write the translation, nothing else:\n\n'+text;
 const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY,{
 method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
@@ -597,16 +569,13 @@ const{data:students}=await sb.from('students').select('*, classes(class_name)').
 const sids=(students||[]).map(s=>s.id);
 if(!sids.length)return alert('Öğrenci bulunamadı');
 const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').in('student_id',sids).order('student_id').order('created_at',{ascending:false});
-let csv='﻿"Öğrenci","Okul No","Sınıf","Öğretmen","Branş","Dönem","Görüş (TR)","Görüş (FR)","Tarih"
-';
+let csv='﻿"Öğrenci","Okul No","Sınıf","Öğretmen","Branş","Dönem","Görüş (TR)","Görüş (FR)","Tarih"\n';
 (students||[]).forEach(st=>{
 const stOps=(ops||[]).filter(o=>o.student_id===st.id);
 if(stOps.length){stOps.forEach(o=>{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","'+(o.teachers?.full_name||'')+'","'+(o.teachers?.branch||'')+'","'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"
-';
+csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","'+(o.teachers?.full_name||'')+'","'+(o.teachers?.branch||'')+'","'+(o.term||'')+'","'+(o.opinion_tr||'').replace(/"/g,'""')+'","'+(o.opinion_fr||'').replace(/"/g,'""')+'","'+new Date(o.created_at).toLocaleDateString('tr-TR')+'"\n';
 })}else{
-csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","","","","Görüş yok","",""
-';
+csv+='"'+st.full_name+'","'+st.student_number+'","'+(st.classes?.class_name||'')+'","","","","Görüş yok","",""\n';
 }});
 const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
 const url=URL.createObjectURL(blob);
@@ -617,30 +586,13 @@ document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeOb
 async function generateGeminiSummary(studentId,studentName){
 const{data:ops}=await sb.from('teacher_opinions').select('*, teachers(full_name, branch)').eq('student_id',studentId);
 if(!ops?.length)return alert('Bu öğrenci için görüş bulunamadı');
-let context='Öğrenci: '+studentName+'
-
-';
+let context='Öğrenci: '+studentName+'\n\n';
 ops.forEach(o=>{context+='Öğretmen: '+(o.teachers?.full_name||'-')+' ('+( o.teachers?.branch||'-')+')
 Görüş: '+(o.opinion_tr||o.opinion_fr||'-')+'
 
-'});
-const prompt='Aşağıdaki öğretmen görüşlerini analiz ederek öğrenci hakkında kapsamlı bir özet paragraf yaz. Güçlü yönleri, gelişim alanlarını ve önerileri içersin. Türkçe ve Fransızca olarak ayrı ayrı yaz.
+'});\nconst prompt='Aşağıdaki öğretmen görüşlerini analiz ederek öğrenci hakkında kapsamlı bir özet paragraf yaz. Güçlü yönleri, gelişim alanlarını ve önerileri içersin. Türkçe ve Fransızca olarak ayrı ayrı yaz.
 
-'+context;
-try{
-const resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY,{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-});
-const data=await resp.json();
-return data?.candidates?.[0]?.content?.parts?.[0]?.text||'Özet oluşturulamadı';
-}catch(e){return 'Hata: '+e.message}
-}
-
-async function aiStudentAnalysis(sid){
-const rc=document.getElementById('aiAnalysisResult');
-if(!rc)return;
-rc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapıyor...</div>';
+'+context;\ntry{\nconst resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_API_KEY,{\nmethod:'POST',headers:{'Content-Type':'application/json'},\nbody:JSON.stringify({contents:[{parts:[{text:prompt}]}]})\n});\nconst data=await resp.json();\nreturn data?.candidates?.[0]?.content?.parts?.[0]?.text||'Özet oluşturulamadı';\n}catch(e){return 'Hata: '+e.message}\n}\n\nasync function aiStudentAnalysis(sid){\nconst rc=document.getElementById('aiAnalysisResult');\nif(!rc)return;\nrc.innerHTML='<div class="loading-overlay"><div class="spinner"></div> Gemini AI analiz yapıyor...</div>';
 try{
 const{data:st}=await sb.from('students').select('*, classes(class_name)').eq('id',sid).single();
 const{data:entries}=await sb.from('student_data').select('*, teachers(full_name)').eq('student_id',sid).order('entry_date',{ascending:false}).limit(50);
