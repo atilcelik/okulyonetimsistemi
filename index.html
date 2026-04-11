@@ -258,6 +258,15 @@ tr:hover td{background:rgba(0,113,227,.025)}
         </div>
         <div id="sec-users"></div>
       </div>
+
+      <!-- TOPLANTI RAPORLARI -->
+      <div class="page" id="page-meetings">
+        <div class="page-header">
+          <h2>📋 Toplantı Raporları</h2>
+          <p>Tüm toplantı raporları — TR/FR çeviri ile arşivlenir</p>
+        </div>
+        <div id="sec-meetings"></div>
+      </div>
     </div>
   </main>
   <footer class="app-footer">
@@ -274,7 +283,8 @@ tr:hover td{background:rgba(0,113,227,.025)}
 const SUPABASE_URL = 'https://wrzsdecsembngeitfyxi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyenNkZWNzZW1ibmdlaXRmeXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTA1MzIsImV4cCI6MjA5MDY4NjUzMn0.WVcmxpmFQ5w53gIUPIg-vWo1Kl09dHyHC_lyOhghi3w';
 const GEMINI_KEY = 'AIzaSyBFqY_7TDc0ejkN5naYTubzgzjZR4UWOEU';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_KEY;
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + GEMINI_KEY;
 
 let sb, CU = null; // Current User
 
@@ -314,26 +324,39 @@ function alertModal(msg, type) {
 }
 
 // Gemini API with retry
-async function callGemini(prompt) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+async function callGemini(prompt, systemInstruction) {
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.7, topK: 40, topP: 0.95, maxOutputTokens: 2048 }
+  };
+  if (systemInstruction) {
+    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const res = await fetch(GEMINI_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify(body)
       });
       if (res.status === 429) {
-        await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
+        await new Promise(r => setTimeout(r, 4000 * (attempt + 1)));
         continue;
       }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error('Gemini hatasi: ' + (err?.error?.message || res.status));
+      }
       const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (!text && attempt < 3) { await new Promise(r => setTimeout(r, 2000)); continue; }
+      return text;
     } catch (e) {
-      if (attempt === 2) throw e;
-      await new Promise(r => setTimeout(r, 2000));
+      if (attempt === 3) throw e;
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
     }
   }
-  throw new Error('Gemini API erişilemiyor');
+  throw new Error('Gemini API erisilemedi');
 }
 
 // Role helpers
@@ -423,6 +446,7 @@ function buildNav() {
   if (!isOgretmen() && !isOfis()) {
     addBtn('👨‍🏫 Öğretmen', () => showPage('teacher'), 'nav-teacher');
   }
+  addBtn('📋 Toplantılar', () => showPage('meetings'), 'nav-meetings');
   if (isAdmin()) {
     addBtn('⚙️ Kullanıcılar', () => showPage('users'), 'nav-users');
   }
@@ -442,6 +466,7 @@ function showPage(name) {
     else if (name === 'attendance') loadAttendancePage();
     else if (name === 'teacher') loadTeacherPage();
     else if (name === 'users') loadUsersPage();
+    else if (name === 'meetings') loadMeetingsPage();
   }
 }
 
@@ -462,6 +487,7 @@ function renderHome() {
   if (!isOgretmen() && !isOfis()) {
     cards.push({ icon:'👨‍🏫', title:'Öğretmen Yönetimi', desc:'Program ve vekil atama', fn:"showPage('teacher')" });
   }
+  cards.push({ icon:'📋', title:'Toplantı Raporları', desc:'Toplantı raporları — Türkçe/Fransızca arşiv', fn:"showPage('meetings')" });
   if (isAdmin()) {
     cards.push({ icon:'⚙️', title:'Kullanıcı Yönetimi', desc:'Kullanıcı ekle, düzenle, sil', fn:"showPage('users')" });
   }
@@ -586,21 +612,32 @@ async function loadTeacherOpinionsUI(el) {
 
   let h = '<div class="card"><div class="card-header"><div><div class="card-title">💬 Öğrenci Görüşleri</div>';
   h += '<div class="card-sub">' + teacher.full_name + ' — ' + teacher.branch + '</div></div></div>';
-  h += '<div style="font-size:13px;color:var(--text2);margin-bottom:12px">Öğrencileriniz için görüş yazın. Türkçe veya Fransızca girebilirsiniz — otomatik çevrilecektir.</div>';
+  h += '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Türkçe veya Fransızca yazın — diğer dile otomatik çevrilecektir.</div>';
 
   (students || []).forEach(st => {
     const op = (myOps || []).find(o => o.student_id === st.id);
     const cls = st.classes ? st.classes.class_name : '';
-    h += '<div class="student-row">';
+    h += '<div style="border:1px solid var(--border2);border-radius:var(--radius);padding:14px;margin-bottom:10px">';
+    // Student header row
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
     h += '<div><span class="student-name">' + esc(st.full_name) + '</span>';
     h += '<span class="student-num">' + esc(st.student_number) + '</span>';
     h += '<span class="badge badge-blue" style="margin-left:6px">' + esc(cls) + '</span>';
     if (op) h += '<span class="badge badge-green" style="margin-left:6px">✓ Görüş var</span>';
     h += '</div>';
-    h += '<div class="row">';
     h += '<button class="btn btn-primary btn-sm" onclick="opinionWriteModal(' + st.id + ',\'' + esc(st.full_name) + '\',' + teacher.id + ')">' + (op ? '✏️ Güncelle' : '+ Görüş Yaz') + '</button>';
-    if (op) h += '<button class="btn btn-secondary btn-sm" onclick="opinionViewOne(' + st.id + ',\'' + esc(st.full_name) + '\')">Görüntüle</button>';
-    h += '</div></div>';
+    h += '</div>';
+    // Show existing opinion TR + FR inline
+    if (op) {
+      h += '<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:var(--radius)">';
+      h += '<div style="font-size:13px;margin-bottom:6px"><span style="font-weight:600;color:var(--accent)">TR</span> ';
+      h += esc(op.opinion_tr || '') + '</div>';
+      h += '<div style="font-size:13px;padding-top:6px;border-top:1px solid var(--border2)"><span style="font-weight:600;color:#c0392b">FR</span> ';
+      h += esc(op.opinion_fr || '') + '</div>';
+      h += '<div style="font-size:11px;color:var(--text3);margin-top:6px">' + esc(op.term || '') + ' — ' + fmt(op.created_at) + '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
   });
 
   h += '</div>';
@@ -655,12 +692,13 @@ async function saveOpinion(studentId, teacherId) {
   html('opModalAlert', '<div class="loading"><div class="spinner"></div> Çevriliyor...</div>');
 
   try {
-    const hasTr = /[ğüşıöçĞÜŞİÖÇ]/.test(text);
+    const hasTr = /[ğüşıöçĞÜŞİÖÇ]/.test(text) || !/[àâäéèêëîïôùûüæœç]/i.test(text);
+    const sysInstr = 'Sen bir egitim uzmanissin. Ogretmen goruslerini iki dil arasinda cevirirken egitim terminolojisini ve resmi dili koru. Ceviriyi birebir yap, yorum ekleme.';
     const prompt = hasTr
-      ? 'Aşağıdaki Türkçe öğretmen görüşünü Fransızcaya çevir. Sadece çeviriyi yaz:\n\n' + text
-      : 'Traduis en turc le commentaire suivant d\'un professeur. Ecris seulement la traduction:\n\n' + text;
+      ? 'Asagidaki Turkce ogretmen gorusunu Fransizca\'ya cevir. Sadece ceviriyi yaz, baska hicbir sey ekleme:\n\n' + text
+      : 'Traduis en turc ce commentaire d\'enseignant. Ecris uniquement la traduction, rien d\'autre:\n\n' + text;
 
-    const translated = await callGemini(prompt);
+    const translated = await callGemini(prompt, sysInstr);
     const opTr = hasTr ? text : translated;
     const opFr = hasTr ? translated : text;
 
@@ -792,8 +830,9 @@ async function downloadClassOpinionsWord() {
         stOps.forEach(o => {
           ctx += (o.teachers ? o.teachers.full_name : '-') + ': ' + (o.opinion_tr || o.opinion_fr || '-') + '\n';
         });
-        const sumPrompt = 'Asagidaki ogretmen goruslerini analiz et. Ogrenci hakkinda Turkce 2-3 cumlelik kisa bir ozet yaz. Sonra ayni ozeti Fransizca yaz. Format: "OZET (TR): ... RESUME (FR): ..."\n\n' + ctx;
-        const sumText = await callGemini(sumPrompt);
+        const sumSys = 'Sen bir egitim uzmanissin. Birden fazla ogretmenin goruslerini sentezleyerek ogrenci hakkinda ozlu, dengeli bir ozet yaziyorsun.';
+        const sumPrompt = 'Asagidaki ogretmen goruslerini sentezle. ONCELIKLE Turkce 3-4 cumlelik bir ozet yaz (guclu yonler, gelisim alanlari, genel degerlendirme). Sonra AYNI ozeti Fransizca yaz.\n\nFormat:\nOZET (TR): [Turkce ozet]\n\nRESUME (FR): [Fransizca ozet]\n\nOgrenci: ' + st.full_name + '\n' + stOps.map(o => (o.teachers ? o.teachers.full_name : '') + ': ' + (o.opinion_tr || o.opinion_fr || '')).join('\n');
+        const sumText = await callGemini(sumPrompt, sumSys);
         docHtml += '<div class="summary"><strong>🤖 Gemini Özeti:</strong><br>' + esc(sumText).replace(/\n/g, '<br>') + '</div>';
       } catch (e) {
         docHtml += '<div class="summary"><em>Özet oluşturulamadı.</em></div>';
@@ -1077,8 +1116,31 @@ async function generateIndividualReport() {
       ops.forEach(o => { ctx += (o.teachers ? o.teachers.full_name : '') + ': ' + (o.opinion_tr || o.opinion_fr || '') + '\n'; });
     }
 
-    const prompt = 'Asagidaki ogrenci verilerini analiz et. Turkce olarak su basliklar altinda detayli bir rapor olustur:\n1. Genel Degerlendirme\n2. Guclu Yonler\n3. Gelismesi Gereken Yonler\n4. Oneriler\n\n' + ctx;
-    const analysis = await callGemini(prompt);
+    const sysInstr = 'Sen deneyimli bir egitim psikologu ve akademik danismansin. Ogrenci verilerini analiz ederek ailelere ve ogretmenlere yardimci olacak detayli, yapici ve ozgul raporlar yaziyorsun. Raporlarin her zaman kanita dayali, empatik ve yonlendirici olsun.';
+
+    const prompt = `Asagidaki ogrenci verilerini kapsamli sekilde analiz et ve Turkce profesyonel bir rapor olustur.
+
+OGRENCI BILGILERI:
+${ctx}
+
+Lutfen asagidaki basliklar altinda DETAYLI bir rapor yaz. Her baslik icin en az 3-4 cumle kullan. Genel ifadelerden kacin, somut verilere atifta bulun:
+
+## 1. Genel Akademik Profil
+Ogrencinin genel durumunu, devamsizlik verisini ve ogretmen goruslerinin genel tonunu degerlendir.
+
+## 2. Guclu Yonler ve Basarilar
+Ogretmen goruslerinden one cikan olumlu ozellikleri, becerileri ve basarilari detaylandir.
+
+## 3. Gelisim Alanlari ve Zorluklar
+Dikkat gerektiren akademik veya sosyal alanlari somut orneklerle acikla.
+
+## 4. Oncelikli Oneriler
+Ogrenciye, aileye ve okula yonelik 3-5 somut, uygulanabilir oneri sun.
+
+## 5. Genel Degerlendirme
+Ogrencinin potansiyeli ve ilerlemesi hakkinda ozet bir degerlendirme yap.`;
+
+    const analysis = await callGemini(prompt, sysInstr);
 
     const { data: stData } = await sb.from('students').select('*, classes(class_name)').eq('id', sid).single();
     let h = '<div class="stats-row">';
@@ -1126,8 +1188,30 @@ async function generateClassReport() {
       ctx += '\n';
     });
 
-    const prompt = 'Asagidaki sinif ozetini analiz et. Turkce olarak su basliklar altinda rapor olustur:\n1. Sinif Genel Durumu\n2. Dikkat Gereken Ogrenciler\n3. Olumlu Gelismeler\n4. Oneriler\n\n' + ctx;
-    const analysis = await callGemini(prompt);
+    const sysInstr = 'Sen deneyimli bir egitim danismanissin. Sinif duzeyinde veri analizleri yaparak okul yonetimine stratejik kararlar icin rapor sunuyorsun.';
+    const prompt = `Asagidaki sinif verilerini analiz et ve Turkce profesyonel bir sinif raporu olustur.
+
+SINIF VERILERI:
+${ctx}
+
+Her baslik icin somut, uygulanabilir bilgiler ver:
+
+## 1. Sinifin Genel Akademik Durumu
+Devamsizlik oranlari, ogretmen gorusleri yogunlugu ve genel sinif profili.
+
+## 2. Ozel Dikkat Gerektiren Ogrenciler
+Yuksek devamsizligi olan veya destege ihtiyac duyan ogrenciler (isimleriyle birlikte).
+
+## 3. Sinifin Guclu Yonleri
+Genel olarak onsuz kabul edilen olumlu gozlemler ve basarilar.
+
+## 4. Ogretmenler Kurulu Icin Oneriler
+Sinif genelinde alinabilecek somut pedagojik ve destekleyici onlemler.
+
+## 5. Ailelere Iletilmesi Gereken Mesajlar
+Veli toplantisinda paylasilabilecek ozet mesajlar.`;
+
+    const analysis = await callGemini(prompt, sysInstr);
 
     let h = '<div class="card"><div class="card-title">🤖 ' + esc(cls ? cls.class_name : '') + ' Sınıf Analizi</div>';
     h += '<div style="margin-top:12px;white-space:pre-wrap;font-size:14px;line-height:1.7">' +
@@ -1654,6 +1738,185 @@ async function deleteUser(id) {
   if (error) alert(error.message);
   else loadUsersPage();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOPLANTI RAPORLARI
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadMeetingsPage() {
+  loading('sec-meetings');
+  const el = $('sec-meetings');
+
+  // New report form
+  let h = '<div class="card">';
+  h += '<div class="card-title" style="margin-bottom:16px">➕ Yeni Toplantı Raporu Ekle</div>';
+  h += '<div class="two-col">';
+  h += '<div class="form-group"><label>Toplantı Başlığı</label>';
+  h += '<input class="form-input" id="mtgTitle" type="text" placeholder="Örn: Şube Öğretmenler Kurulu — Nisan 2025"></div>';
+  h += '<div class="form-group"><label>Toplantı Tarihi</label>';
+  h += '<input class="form-input" id="mtgDate" type="date" value="' + today() + '"></div></div>';
+  h += '<div class="form-group"><label>Toplantı Türü</label>';
+  h += '<select class="form-input" id="mtgType">';
+  ['Sube Ogretmenler Kurulu', 'Zumre Toplantisi', 'Veli Toplantisi', 'Yonetim Toplantisi', 'Komisyon Toplantisi', 'Diger'].forEach(t => {
+    h += '<option value="' + t + '">' + t + '</option>';
+  });
+  h += '</select></div>';
+  h += '<div class="form-group"><label>Katılımcılar</label>';
+  h += '<input class="form-input" id="mtgParticipants" type="text" placeholder="Ör: Tüm öğretmenler, Müdür..."></div>';
+  h += '<div class="form-group"><label>Rapor / Tutanak (Türkçe veya Fransızca)</label>';
+  h += '<textarea class="form-input" id="mtgContent" rows="7" placeholder="Toplantıda alınan kararları, görüşmeleri ve gündem maddelerini buraya yazın..."></textarea></div>';
+  h += '<div style="display:flex;gap:8px;align-items:center">';
+  h += '<button class="btn btn-primary" onclick="saveMeetingReport()">💾 Kaydet & Çevir</button>';
+  h += '<span id="mtgSaveStatus" style="font-size:13px;color:var(--text2)"></span></div></div>';
+
+  // Archive
+  h += '<div id="mtgListWrap" style="margin-top:16px"></div>';
+  el.innerHTML = h;
+  loadMeetingsList();
+}
+
+async function saveMeetingReport() {
+  const title = $('mtgTitle').value.trim();
+  const date = $('mtgDate').value;
+  const type = $('mtgType').value;
+  const participants = $('mtgParticipants').value.trim();
+  const content = $('mtgContent').value.trim();
+
+  if (!title || !content) {
+    $('mtgSaveStatus').innerHTML = '<span style="color:var(--red)">Başlık ve rapor metni gerekli</span>';
+    return;
+  }
+
+  $('mtgSaveStatus').innerHTML = '<span class="spinner" style="display:inline-block"></span> Çevriliyor...';
+
+  try {
+    const hasTr = /[ğüşıöçĞÜŞİÖÇ]/.test(content) || !/[àâäéèêëîïôùûüæœç]/i.test(content);
+    const sysInstr = 'Sen resmi toplanti tutanaklarini iki dil arasinda ceviren bir uzmansin. Resmi dil ve toplanti terminolojisini koru.';
+    const translatePrompt = hasTr
+      ? 'Asagidaki Turkce toplanti raporunu Fransizca\'ya cevir. Sadece ceviriyi yaz:\n\n' + content
+      : 'Traduis en turc ce rapport de reunion. Ecris uniquement la traduction:\n\n' + content;
+
+    const translated = await callGemini(translatePrompt, sysInstr);
+    const contentTr = hasTr ? content : translated;
+    const contentFr = hasTr ? translated : content;
+
+    const { error } = await sb.from('meeting_reports').insert({
+      title: title,
+      meeting_date: date,
+      meeting_type: type,
+      participants: participants || null,
+      content_tr: contentTr,
+      content_fr: contentFr,
+      created_by: CU.id,
+      created_by_name: CU.full_name || CU.username
+    });
+
+    if (error) {
+      $('mtgSaveStatus').innerHTML = '<span style="color:var(--red)">' + esc(error.message) + '</span>';
+      return;
+    }
+
+    $('mtgSaveStatus').innerHTML = '<span style="color:var(--green)">✓ Kaydedildi!</span>';
+    $('mtgTitle').value = '';
+    $('mtgContent').value = '';
+    $('mtgParticipants').value = '';
+    setTimeout(() => { $('mtgSaveStatus').innerHTML = ''; }, 3000);
+    loadMeetingsList();
+  } catch (e) {
+    $('mtgSaveStatus').innerHTML = '<span style="color:var(--red)">Hata: ' + esc(e.message) + '</span>';
+  }
+}
+
+async function loadMeetingsList() {
+  loading('mtgListWrap');
+  const { data: reports } = await sb.from('meeting_reports')
+    .select('*').order('meeting_date', { ascending: false });
+
+  if (!reports || !reports.length) {
+    html('mtgListWrap', '<div class="alert alert-info">Henüz toplantı raporu eklenmemiş.</div>');
+    return;
+  }
+
+  // Group by type for filter
+  let h = '<div class="card"><div class="card-header"><div class="card-title">📁 Arşiv</div>';
+  h += '<span style="font-size:13px;color:var(--text2)">' + reports.length + ' rapor</span></div>';
+
+  // Search/filter
+  h += '<div class="search-wrap" style="margin-bottom:12px">';
+  h += '<input class="form-input" id="mtgSearch" type="text" placeholder="Başlık veya içerik ara..." oninput="filterMeetings()">';
+  h += '</div>';
+
+  h += '<div id="mtgCards">';
+  h += renderMeetingCards(reports);
+  h += '</div></div>';
+  html('mtgListWrap', h);
+
+  // Store for filtering
+  window._allMeetings = reports;
+}
+
+function renderMeetingCards(reports) {
+  let h = '';
+  reports.forEach(r => {
+    h += '<div style="border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:10px;overflow:hidden">';
+    // Header
+    h += '<div style="padding:12px 16px;background:var(--bg);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggleMeeting(' + r.id + ')">';
+    h += '<div>';
+    h += '<div style="font-weight:600;font-size:14px">' + esc(r.title) + '</div>';
+    h += '<div style="font-size:12px;color:var(--text3);margin-top:2px">';
+    h += esc(r.meeting_date) + ' &nbsp;·&nbsp; ';
+    h += '<span class="badge badge-blue">' + esc(r.meeting_type || 'Toplanti') + '</span>';
+    if (r.participants) h += ' &nbsp;·&nbsp; ' + esc(r.participants);
+    h += '<br><span style="color:var(--text3)">Ekleyen: ' + esc(r.created_by_name || '-') + '</span>';
+    h += '</div></div>';
+    h += '<span style="font-size:18px;color:var(--text3)">▾</span>';
+    h += '</div>';
+    // Content (collapsed by default)
+    h += '<div id="mtg_' + r.id + '" style="display:none;padding:16px">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+    // TR
+    h += '<div>';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Türkçe</div>';
+    h += '<div style="font-size:13px;line-height:1.7;white-space:pre-wrap">' + esc(r.content_tr || '') + '</div>';
+    h += '</div>';
+    // FR
+    h += '<div style="border-left:1px solid var(--border2);padding-left:16px">';
+    h += '<div style="font-size:11px;font-weight:700;color:#c0392b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Français</div>';
+    h += '<div style="font-size:13px;line-height:1.7;white-space:pre-wrap">' + esc(r.content_fr || '') + '</div>';
+    h += '</div>';
+    h += '</div>';
+    if (isAdmin() || (CU && r.created_by === CU.id)) {
+      h += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)">';
+      h += '<button class="btn btn-xs btn-danger" onclick="deleteMeeting(' + r.id + ')">Sil</button>';
+      h += '</div>';
+    }
+    h += '</div></div>';
+  });
+  return h;
+}
+
+function toggleMeeting(id) {
+  const el = $('mtg_' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function filterMeetings() {
+  const q = ($('mtgSearch').value || '').toLowerCase();
+  const filtered = (window._allMeetings || []).filter(r =>
+    (r.title || '').toLowerCase().includes(q) ||
+    (r.content_tr || '').toLowerCase().includes(q) ||
+    (r.content_fr || '').toLowerCase().includes(q) ||
+    (r.participants || '').toLowerCase().includes(q)
+  );
+  html('mtgCards', renderMeetingCards(filtered));
+}
+
+async function deleteMeeting(id) {
+  if (!confirm('Bu rapor silinecek?')) return;
+  const { error } = await sb.from('meeting_reports').delete().eq('id', id);
+  if (error) alert(error.message);
+  else loadMeetingsList();
+}
+
 
 </script>
 </body>
