@@ -292,8 +292,38 @@ tr:hover td{background:rgba(0,113,227,.025)}
 const SUPABASE_URL = 'https://wrzsdecsembngeitfyxi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyenNkZWNzZW1ibmdlaXRmeXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTA1MzIsImV4cCI6MjA5MDY4NjUzMn0.WVcmxpmFQ5w53gIUPIg-vWo1Kl09dHyHC_lyOhghi3w';
 const GEMINI_KEY = 'AIzaSyBFqY_7TDc0ejkN5naYTubzgzjZR4UWOEU';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + GEMINI_KEY;
+
+// Rate limiter: max 12 req/min, queue-based
+const _gq = [];
+let _gRunning = false;
+async function _runQueue() {
+  if (_gRunning) return;
+  _gRunning = true;
+  while (_gq.length > 0) {
+    const { body, resolve, reject } = _gq.shift();
+    try {
+      const res = await fetch(GEMINI_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      if (res.status === 429) {
+        _gq.unshift({ body, resolve, reject });
+        await new Promise(r => setTimeout(r, 10000));
+        continue;
+      }
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        reject(new Error('Gemini: ' + (e?.error?.message || res.status)));
+      } else {
+        const d = await res.json();
+        resolve(d?.candidates?.[0]?.content?.parts?.[0]?.text || '');
+      }
+    } catch (e) { reject(e); }
+    if (_gq.length > 0) await new Promise(r => setTimeout(r, 5000));
+  }
+  _gRunning = false;
+}
 
 let sb, CU = null; // Current User
 
@@ -332,40 +362,17 @@ function alertModal(msg, type) {
   showModal('<div class="alert alert-' + type + '">' + msg + '</div><div style="margin-top:16px"><button class="btn btn-secondary" onclick="closeModal()">Kapat</button></div>');
 }
 
-// Gemini API with retry
+// Gemini API - queue based rate limiter
 async function callGemini(prompt, systemInstruction) {
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.7, topK: 40, topP: 0.95, maxOutputTokens: 2048 }
   };
-  if (systemInstruction) {
-    body.systemInstruction = { parts: [{ text: systemInstruction }] };
-  }
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (res.status === 429) {
-        await new Promise(r => setTimeout(r, 4000 * (attempt + 1)));
-        continue;
-      }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error('Gemini hatasi: ' + (err?.error?.message || res.status));
-      }
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!text && attempt < 3) { await new Promise(r => setTimeout(r, 2000)); continue; }
-      return text;
-    } catch (e) {
-      if (attempt === 3) throw e;
-      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-    }
-  }
-  throw new Error('Gemini API erisilemedi');
+  if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  return new Promise((resolve, reject) => {
+    _gq.push({ body, resolve, reject });
+    _runQueue();
+  });
 }
 
 // Role helpers
